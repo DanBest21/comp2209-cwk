@@ -85,9 +85,11 @@ printLambda _ = ""
 
 -- Challenge 4
 -- Parse recursive let expression, possibly containing numerals
-parseLet :: String -> Maybe LetExpr
-parseLet _ = Just (LetVar (-1))
+expr :: Parser LetExpr
+expr = 
 
+parseLet :: String -> Maybe LetExpr
+parseLet = fst . head . (parse expr)
 
 -- Challenge 5
 -- Translate a let expression into lambda calculus, using Scott numerals
