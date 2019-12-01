@@ -115,12 +115,29 @@ printLambda _ = ""
 --            return (Or e1 e2)
 -- ****************************************************************
 
--- digitExp :: Parser LetExpr
+-- digitExp :: Parser Char
 -- digitExp = do d <- digit
 --               return d
 
--- digitsExp :: Parser LetExpr
+-- digitsExp :: Parser [Char]
 -- digitsExp = some digitExp
+
+numExp :: Parser LetExpr
+numExp = do n <- nat
+            return (LetNum n)
+
+varExp :: Parser LetExpr
+varExp = do char "x"
+            n <- nat
+            return (LetVar n)
+
+funExp :: Parser LetExpr
+funExp = do char "f"
+            n <- nat
+            return (LetFun n)
+
+-- varListExp :: Parser LetExpr
+-- varListExp = 
 
 -- expr :: Parser LetExpr
 -- expr = 
