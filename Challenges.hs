@@ -40,7 +40,7 @@ nextFreeVariable e n | isBound e n (True) = nextFreeVariable e (n+1)
                      | otherwise          = n
 
 -- Perform an alpha conversion on the given m value, changing it to the value of n when found in a LamVar.
--- Ensure that any LamAbs that has this new n value is changed to m (these will be unbound).
+-- Ensure that any LamAbs that has this new n value is changed to m (these will be unbound), and vice versa.
 alphaConversion :: LamExpr -> Int -> Int -> LamExpr
 alphaConversion (LamApp e1 e2) n m = LamApp (alphaConversion e1 n m) (alphaConversion e2 n m)
 alphaConversion (LamAbs x e) n m | x == m    = LamAbs n (alphaConversion e n m) 
@@ -52,8 +52,9 @@ alphaConversion (LamVar x) n m | x == m    = LamVar n
 -- Convert an expression to ANF, handling each case for LamAbs accordingly:
 -- - In the case that x == n but x isn't bound to anything, then leave it as it is.
 -- - Otherwise, in all other cases x == n, then we need to increase the value of n by 1 for later conversions.
+-- - If x /= n, but x is bound to a value and n is already bound to something else, perform an alpha conversion that handles both accordingly.
 -- - If x /= n, but x is bound to a value, then perform an alpha conversion, changing any value bound to this LamAbs.
--- - Else, if n isn't a free value, then perform an alpha conversion, changing any instance of that value to the next free value.
+-- - Else, if n has a free value, then perform an alpha conversion, changing any instance of that value to the next free value.
 -- - Otherwise, n is a free value, and we are free to simply change this value to it.
 convertToANF :: LamExpr -> Int -> LamExpr
 convertToANF (LamApp e1 e2) n = LamApp (convertToANF e1 n) (convertToANF e2 n)
