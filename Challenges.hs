@@ -1,5 +1,5 @@
--- comp2209 Functional Programming Challenges
--- (c) University of Southampton 2019
+-- COMP2209 Functional Programming Challenges
+-- (c) Daniel Best, University of Southampton 2019
 -- Skeleton code to be updated with your solutions
 -- The dummy functions here simply return a random value that is usually wrong 
 
@@ -22,8 +22,11 @@ data LetExpr = LetApp LetExpr LetExpr  |  LetDef [([Int], LetExpr)] LetExpr |  L
 
 -- ADD YOUR OWN CODE HERE
 -- Challenge 1
--- generate the alpha normal form for a simple lambda calculus expression
+-- Generate the alpha normal form for a simple lambda calculus expression
 -- each bound variable is chosen to be the first one possible
+
+-- Checks to see if the value is bound, first by finding a LamAbs exists for it, and 
+-- then finding a LamVar that it binds too.
 isBound :: LamExpr -> Int -> Bool -> Bool
 isBound (LamApp e1 e2) x b = (isBound e1 x b) || (isBound e2 x b)
 isBound (LamAbs n e) x b | x == n || b == True = isBound e x (True)
@@ -31,40 +34,49 @@ isBound (LamAbs n e) x b | x == n || b == True = isBound e x (True)
 isBound (LamVar n) x b | x == n && b = True
                        | otherwise   = False
 
+-- Find the next free variable value, also considering free variables.
 nextFreeVariable :: LamExpr -> Int -> Int
 nextFreeVariable e n | isBound e n (True) = nextFreeVariable e (n+1)
                      | otherwise          = n
 
-renameVariable :: LamExpr -> Int -> Int -> LamExpr
-renameVariable (LamApp e1 e2) n m = LamApp (renameVariable e1 n m) (renameVariable e2 n m)
-renameVariable (LamAbs x e) n m | x == n    = LamAbs m (renameVariable e n m) 
-                                | otherwise = LamAbs x (renameVariable e n m)
-renameVariable (LamVar x) n m | x == m    = LamVar n
-                              | otherwise = LamVar x 
+-- Perform an alpha conversion on the given m value, changing it to the value of n when found in a LamVar.
+-- Ensure that any LamAbs that has this new n value is changed to m (these will be unbound).
+alphaConversion :: LamExpr -> Int -> Int -> LamExpr
+alphaConversion (LamApp e1 e2) n m = LamApp (alphaConversion e1 n m) (alphaConversion e2 n m)
+alphaConversion (LamAbs x e) n m | x == n    = LamAbs m (alphaConversion e n m) 
+                                 | otherwise = LamAbs x (alphaConversion e n m)
+alphaConversion (LamVar x) n m | x == m    = LamVar n
+                               | otherwise = LamVar x 
 
-alphaConversion :: LamExpr -> Int -> LamExpr
-alphaConversion (LamApp e1 e2) n = LamApp (alphaConversion e1 n) (alphaConversion e2 n)
-alphaConversion (LamAbs x e) n | x == n && not(bBound) = LamAbs x (alphaConversion e n)
-                               | x == n                = LamAbs x (alphaConversion e (n + 1))
-                               | bBound                = LamAbs n (alphaConversion (renameVariable e n x) (n + 1))
-                               | bFree                 = LamAbs n (alphaConversion (renameVariable e free n) free)
-                               | otherwise             = LamAbs n (alphaConversion e n)
+-- Convert an expression to ANF, handling each case for LamAbs accordingly:
+-- - In the case that x == n but x isn't bound to anything, then leave it as it is.
+-- - Otherwise, in all other cases x == n, then we need to increase the value of n by 1 for later conversions.
+-- - If x /= n, but x is bound to a value, then perform an alpha conversion, changing any value bound to this LamAbs.
+-- - Else, if n isn't a free value, then perform an alpha conversion, changing any instance of that value to the next free value.
+-- - Otherwise, n is a free value, and we are free to simply change this value to it.
+convertToANF :: LamExpr -> Int -> LamExpr
+convertToANF (LamApp e1 e2) n = LamApp (convertToANF e1 n) (convertToANF e2 n)
+convertToANF (LamAbs x e) n | x == n && not(bBound) = LamAbs x (convertToANF e n)
+                            | x == n                = LamAbs x (convertToANF e (n + 1))
+                            | bBound                = LamAbs n (convertToANF (alphaConversion e n x) (n + 1))
+                            | not(bFree)            = LamAbs n (convertToANF (alphaConversion e free n) free)
+                            | otherwise             = LamAbs n (convertToANF e n)
                         where bBound = isBound (LamAbs x e) x (False)
-                              bFree = not(isBound (LamAbs x e) n (False))
+                              bFree = isBound (LamAbs x e) n (False)
                               free = nextFreeVariable (LamAbs x e) n
-alphaConversion (LamVar x) n = LamVar x
+convertToANF (LamVar x) n = LamVar x
 
 alphaNorm :: LamExpr -> LamExpr
-alphaNorm e = alphaConversion e 0
+alphaNorm e = convertToANF e 0
 
 -- Challenge 2
--- count all reduction paths for a given lambda expression m, of length up to a given limit l
+-- Count all reduction paths for a given lambda expression m, of length up to a given limit l
 countAllReds :: LamExpr -> Int -> Int
 countAllReds _ _ = -1
 
 
 -- Challenge 3 
--- pretty print a lambda expression, combining abstraction variables
+-- Pretty print a lambda expression, combining abstraction variables
 -- also recognising Scott numerals and printing these as numbers
 -- finalising omitting brackets where possible and safe to do so
 printLambda :: LamExpr -> String
@@ -72,20 +84,20 @@ printLambda _ = ""
 
 
 -- Challenge 4
--- parse recursive let expression, possibly containing numerals
+-- Parse recursive let expression, possibly containing numerals
 parseLet :: String -> Maybe LetExpr
 parseLet _ = Just (LetVar (-1))
 
 
 -- Challenge 5
--- translate a let expression into lambda calculus, using Scott numerals
+-- Translate a let expression into lambda calculus, using Scott numerals
 -- convert let symbols to lambda variables using Jansen's techniques rather than Y
 letToLambda :: LetExpr -> LamExpr
 letToLambda _ = LamVar (-1)
 
 
 -- Challenge 6
--- convert a lambda calculus expression into one using let expressions and application
+-- Convert a lambda calculus expression into one using let expressions and application
 -- can use lambda lifting techniques described in wikipedia article
 lambdaToLet :: LamExpr -> LetExpr
 lambdaToLet _ = LetVar (-1)
