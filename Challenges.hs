@@ -43,7 +43,8 @@ nextFreeVariable e n | isBound e n (True) = nextFreeVariable e (n+1)
 -- Ensure that any LamAbs that has this new n value is changed to m (these will be unbound).
 alphaConversion :: LamExpr -> Int -> Int -> LamExpr
 alphaConversion (LamApp e1 e2) n m = LamApp (alphaConversion e1 n m) (alphaConversion e2 n m)
-alphaConversion (LamAbs x e) n m | x == n    = LamAbs m (alphaConversion e n m) 
+alphaConversion (LamAbs x e) n m | x == m    = LamAbs n (alphaConversion e n m) 
+                                 | x == n    = LamAbs m (alphaConversion e n m) 
                                  | otherwise = LamAbs x (alphaConversion e n m)
 alphaConversion (LamVar x) n m | x == m    = LamVar n
                                | otherwise = LamVar x 
@@ -58,6 +59,7 @@ convertToANF :: LamExpr -> Int -> LamExpr
 convertToANF (LamApp e1 e2) n = LamApp (convertToANF e1 n) (convertToANF e2 n)
 convertToANF (LamAbs x e) n | x == n && not(bBound) = LamAbs x (convertToANF e n)
                             | x == n                = LamAbs x (convertToANF e (n + 1))
+                            | bBound && bFree       = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) (n + 1))
                             | bBound                = LamAbs n (convertToANF (alphaConversion e n x) (n + 1))
                             | not(bFree)            = LamAbs n (convertToANF (alphaConversion e free n) free)
                             | otherwise             = LamAbs n (convertToANF e n)
@@ -85,11 +87,46 @@ printLambda _ = ""
 
 -- Challenge 4
 -- Parse recursive let expression, possibly containing numerals
-expr :: Parser LetExpr
-expr = 
+
+-- TEMP *************************************************************
+-- varExp :: Parser BExp
+-- varExp = do s <- ident
+--             return (Var s)
+
+-- truExp :: Parser BExp
+-- truExp = do symbol "T"
+--             return (Tru)
+ 
+-- flsExp :: Parser BExp
+-- flsExp = do symbol "F" 
+--             return (Fls)
+
+-- andExp :: Parser BExp
+-- andExp = do e1 <- lowerExpr
+--             symbol "&" 
+--             e2 <- expr
+--             return (And e1 e2)
+
+-- orExp :: Parser BExp
+-- orExp = do e1 <- evenLowerExpr
+--            symbol "|"
+--            e2 <- lowerExpr
+--            return (Or e1 e2)
+-- ****************************************************************
+
+-- digitExp :: Parser LetExpr
+-- digitExp = do d <- digit
+--               return d
+
+-- digitsExp :: Parser LetExpr
+-- digitsExp = some digitExp
+
+-- expr :: Parser LetExpr
+-- expr = 
 
 parseLet :: String -> Maybe LetExpr
-parseLet = fst . head . (parse expr)
+-- parseLet = fst . head . (parse expr)
+parseLet _ = Just (LetVar (-1))
 
 -- Challenge 5
 -- Translate a let expression into lambda calculus, using Scott numerals
