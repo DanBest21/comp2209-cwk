@@ -130,16 +130,22 @@ convertToBNF e | isBNF     = e
                   right = rightReduction e
                   isBNF = (e == left) && (e == right)
 
+extractExpression :: Zipper -> LamExpr
+extractExpression (e, ts) = alphaNorm e
+
 possibleReductions :: Zipper -> LamExpr -> [Zipper]
 possibleReductions z@(LamApp l r, ts) e | bLeft     = [goRoot(leftReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
                                         | bRight    = [goRoot(rightReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
-                                        | otherwise = possibleReductions (goLeft z) ++ possibleReductions (goRight z) e
+                                        | otherwise = possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
             where bLeft = (goRoot(leftReduction (LamApp l r), ts) /= goRoot z)
                   bRight = (goRoot(rightReduction (LamApp l r), ts) /= goRoot z)
 possibleReductions z@(LamAbs x r, ts) e = possibleReductions (goRight z) e
-possibleReductions z e | bBNF      = [goRoot z]
+possibleReductions z e | bBNF      = [root]
                        | otherwise = []
-            where bBNF = alphaNorm (convertToBNF e) == 
+            where bnf = alphaNorm (convertToBNF e)
+                  root = goRoot z
+                  rootExp = extractExpression root
+                  bBNF = rootExp == bnf
 
 filterDuplicates :: [Zipper] -> LamExpr -> [Zipper]
 filterDuplicates zs e = [ z | z@(e', ts) <- zs, alphaNorm (e') == bnf ] ++ nub [ z | z@(e', ts) <- zs, alphaNorm (e') /= bnf ]
@@ -154,24 +160,12 @@ possibleReductionsToLimit zs 0 e = []
 possibleReductionsToLimit zs 1 e = zs
 possibleReductionsToLimit zs n e = possibleReductionsToLimit (possibleReductionsList zs e) (n-1) e
 
--- reductionsToLimit :: LamExpr -> Int -> LamExpr -> [LamExpr]
--- reductionsToLimit e1 0 e2 = []
--- reductionsToLimit (LamApp e1 e2) n e | n == 1         = [e]
---                                      | bEqual         = nub (reductionsToLimit left (n - 1) left ++ [LamApp (head (reductionsToLimit e1 n e)) e2] ++ [LamApp e1 (head (reductionsToLimit e2 n e))])
---                                      | otherwise      = nub (reductionsToLimit left (n - 1) left ++ reductionsToLimit right (n - 1) right ++ [LamApp (head (reductionsToLimit e1 n e)) e2] ++ [LamApp e1 (head (reductionsToLimit e2 n e))])
---             where left = leftReduction (LamApp e1 e2)
---                   right = rightReduction (LamApp e1 e2)
---                   bEqual = alphaNorm left == alphaNorm right
--- reductionsToLimit (LamAbs x e1) n e | n == 1    = [e]
---                                     | otherwise = [LamAbs x (head (reductionsToLimit e1 n e))]
--- reductionsToLimit (LamVar x) n e | n == 1    = [e]
---                                  | otherwise = [LamVar x]
-
--- countAllReds' :: LamExpr -> Int -> [LamExpr]
--- countAllReds' e n = [ handleSingleVariable (alphaNorm x) | x <- reductionsToLimit e n e ]
+countAllReds' :: LamExpr -> Int -> [LamExpr]
+countAllReds' e n = [ handleSingleVariable (alphaNorm x) | (x, ts) <- possibleReductionsToLimit [(e, [])] n e, handleSingleVariable (alphaNorm x) == bnf ]
+            where bnf = handleSingleVariable (alphaNorm (convertToBNF e))
 
 countAllReds :: LamExpr -> Int -> Int
-countAllReds e n = (-1) -- length [ handleSingleVariable (alphaNorm x) | x <- reductionsToLimit e n e, handleSingleVariable x == bnf ]
+countAllReds e n = length [ handleSingleVariable (alphaNorm x) | (x, ts) <- possibleReductionsToLimit [(e, [])] n e, handleSingleVariable (alphaNorm x) == bnf ]
             where bnf = handleSingleVariable (alphaNorm (convertToBNF e))
 
 -- Challenge 3 
