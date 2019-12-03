@@ -65,15 +65,15 @@ convertToANF (LamApp e1 e2) n | bIsBound1 && bIsBound2 = LamApp (convertToANF e1
                         where bIsBound1 = isBound e1 n (False)
                               bIsBound2 = isBound e2 n (False)
                               free = (nextFreeVariable (LamApp e1 e2) n)
-convertToANF (LamAbs x e) n | x == n && not(bBound) = LamAbs x (convertToANF e n)
-                            | x == n                = LamAbs x (convertToANF e (n + 1))
-                            | bBound && bFree       = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) (n + 1))
-                            | bBound && bSecond     = LamAbs n (convertToANF (alphaConversion e n x) n)
-                            | bBound                = LamAbs n (convertToANF (alphaConversion e n x) (n + 1))
-                            | not(bFree)            = LamAbs n (convertToANF (alphaConversion e free n) free)
-                            | otherwise             = LamAbs n (convertToANF e n)
-                        where bBound = isBound (LamAbs x e) x (False)
-                              bFree = isBound (LamAbs x e) n (False)
+convertToANF (LamAbs x e) n | x == n && not(bBoundOld) = LamAbs x (convertToANF e n)
+                            | x == n                   = LamAbs x (convertToANF e (n + 1))
+                            | bBoundOld && bBoundNew   = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) (n + 1))
+                            | bBoundOld && bSecond     = LamAbs n (convertToANF (alphaConversion e n x) n)
+                            | bBoundOld                = LamAbs n (convertToANF (alphaConversion e n x) (n + 1))
+                            | not(bBoundNew)           = LamAbs n (convertToANF (alphaConversion e free n) free)
+                            | otherwise                = LamAbs n (convertToANF e n)
+                        where bBoundOld = isBound (LamAbs x e) x (False)
+                              bBoundNew = isBound (LamAbs x e) n (False)
                               bSecond = isBound e x (False)
                               free = nextFreeVariable (LamAbs x e) n
 convertToANF (LamVar x) n = LamVar x
@@ -83,6 +83,20 @@ alphaNorm e = convertToANF e 0
 
 -- Challenge 2
 -- Count all reduction paths for a given lambda expression m, of length up to a given limit l
+
+-- data Direction a = L a (LamExpr a) | R a (LamExpr a) deriving (Show)
+-- type Trail a = [Direction a]
+-- type Zipper a = (LamExpr a, Trail a) 
+
+-- goLeft, goRight, goUp :: Zipper a -> Zipper a
+-- goLeft (LamApp l r, ts) = (l , L x r:ts)
+-- goRight (LamApp l r, ts) = (r , R x l:ts)
+-- goUp (t , L x r : ts) = (Node x t r , ts)
+-- goUp (t , R x l : ts) = (Node x l t , ts)
+
+-- goRoot :: Zipper a -> Zipper a
+-- goRoot (t, []) = (t, [])
+-- goRoot z = goRoot $ goUp z
 
 betaConversion :: LamExpr -> Int -> LamExpr -> LamExpr
 betaConversion (LamApp e1 e2) n e = LamApp (betaConversion e1 n e) (betaConversion e2 n e)
@@ -94,13 +108,42 @@ betaConversion (LamAbs x e1) n e | x /= n && not(bFree) = LamAbs x (betaConversi
 betaConversion (LamVar x) n e | x == n    = e
                               | otherwise = LamVar x
 
+leftReduction :: LamExpr -> LamExpr
+leftReduction (LamApp (LamAbs x e) e2) = betaConversion e x e2
+leftReduction (LamApp e1 e2) = LamApp (leftReduction e1) (e2)
+leftReduction (LamAbs x e) = LamAbs x e
+leftReduction (LamVar x) = LamVar x
+
+rightReduction :: LamExpr -> LamExpr
+rightReduction (LamApp (LamAbs x e) e2) = betaConversion e x e2
+rightReduction (LamApp e1 e2) = LamApp (e1) (rightReduction e2)
+rightReduction (LamAbs x e) = LamAbs x e
+rightReduction (LamVar x) = LamVar x
+
 convertToBNF :: LamExpr -> LamExpr
-convertToBNF (LamApp (LamAbs x e) e2) = betaConversion e x e2
-convertToBNF (LamApp e1 e2) = LamApp (convertToBNF e1) (e2)
-convertToBNF (LamAbs x e) = LamAbs x e
+convertToBNF e | isBNF     = e
+               | left /= e = convertToBNF left
+               | otherwise = convertToBNF right
+            where left = leftReduction e
+                  right = rightReduction e
+                  isBNF = (e == left) && (e == right)
+      
+reductionsToLimit :: LamExpr -> LamExpr -> Int -> [LamExpr]
+reductionsToLimit (LamApp e1 e2) e n | n == 0    = []
+                                     | n == 1    = [e]
+                                     | otherwise = reductionsToLimit left left (n - 1) ++ reductionsToLimit right right (n - 1) ++ [(LamApp (head $ reductionsToLimit e1 e n) (e2))] ++ [(LamApp (e1) (head $ reductionsToLimit e2 e n))]
+            where left = (leftReduction (LamApp e1 e2))
+                  right = (rightReduction (LamApp e1 e2))
+reductionsToLimit (LamAbs x e1) e n = [(LamAbs x (head $ reductionsToLimit e1 e n))]
+reductionsToLimit (LamVar x) e n = [e] 
+
+countAllReds' :: LamExpr -> Int -> [LamExpr]
+countAllReds' e n = [ x | x <- reductionsToLimit e e n ]
+            where bnf = convertToBNF e
 
 countAllReds :: LamExpr -> Int -> Int
-countAllReds _ _ = -1
+countAllReds e n = length [ x | x <- reductionsToLimit e e n, x == bnf ]
+            where bnf = convertToBNF e
 
 -- Challenge 3 
 -- Pretty print a lambda expression, combining abstraction variables
@@ -112,8 +155,8 @@ countAllReds _ _ = -1
 checkScottEncoding :: LamExpr -> Int -> Int
 checkScottEncoding (LamAbs x (LamAbs y (LamVar z))) n | x == z    = n
                                                       | otherwise = -1
-checkScottEncoding (LamAbs x (LamAbs y (LamApp (LamVar z) (LamAbs z' e)))) n | y == z && z == z' = checkScottEncoding (LamAbs z' e) (n + 1)
-                                                                             | otherwise         = -1
+checkScottEncoding (LamAbs x (LamAbs y (LamApp (LamVar z) e))) n | y == z = checkScottEncoding e (n + 1)
+                                                                 | otherwise         = -1
 checkScottEncoding _ n = -1
 
 -- Get the number of abstractions (LamAbs) in the given expression.
