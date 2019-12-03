@@ -83,9 +83,24 @@ alphaNorm e = convertToANF e 0
 
 -- Challenge 2
 -- Count all reduction paths for a given lambda expression m, of length up to a given limit l
+
+betaConversion :: LamExpr -> Int -> LamExpr -> LamExpr
+betaConversion (LamApp e1 e2) n e = LamApp (betaConversion e1 n e) (betaConversion e2 n e)
+betaConversion (LamAbs x e1) n e | x /= n && not(bFree) = LamAbs x (betaConversion e1 n e)
+                                 | x /= n && bFree      = betaConversion (LamAbs free (betaConversion e1 x (LamVar free))) n e
+                                 | otherwise            = LamAbs x e1
+                     where bFree = not(isBound (LamAbs x e) x (False))
+                           free = nextFreeVariable (LamAbs x e) n
+betaConversion (LamVar x) n e | x == n    = e
+                              | otherwise = LamVar x
+
+convertToBNF :: LamExpr -> LamExpr
+convertToBNF (LamApp (LamAbs x e) e2) = betaConversion e x e2
+convertToBNF (LamApp e1 e2) = LamApp (convertToBNF e1) (e2)
+convertToBNF (LamAbs x e) = LamAbs x e
+
 countAllReds :: LamExpr -> Int -> Int
 countAllReds _ _ = -1
-
 
 -- Challenge 3 
 -- Pretty print a lambda expression, combining abstraction variables
@@ -95,8 +110,10 @@ countAllReds _ _ = -1
 -- Check to see if the provided expression is the Scott Encoding of a natural number, and returns that value if it is.
 -- Otherwise, return -1 to indicate that it is not.
 checkScottEncoding :: LamExpr -> Int -> Int
-checkScottEncoding (LamAbs x (LamAbs y (LamVar z))) n = n
-checkScottEncoding (LamAbs x (LamAbs y (LamApp (LamVar z) e))) n = checkScottEncoding e (n + 1)
+checkScottEncoding (LamAbs x (LamAbs y (LamVar z))) n | x == z    = n
+                                                      | otherwise = -1
+checkScottEncoding (LamAbs x (LamAbs y (LamApp (LamVar z) (LamAbs z' e)))) n | y == z && z == z' = checkScottEncoding (LamAbs z' e) (n + 1)
+                                                                             | otherwise         = -1
 checkScottEncoding _ n = -1
 
 -- Get the number of abstractions (LamAbs) in the given expression.
@@ -111,17 +128,17 @@ printExpression :: LamExpr -> Int -> String
 printExpression (LamApp (LamAbs x e1) (LamAbs y e2)) i | bLastAbs  = "(" ++ (printExpression (LamAbs x e1) i) ++ ")" ++ " " ++ (printExpression (LamAbs y e2) right)
                                                        | otherwise = "(" ++ (printExpression (LamAbs x e1) i) ++ ")" ++ " " ++ "(" ++ (printExpression (LamAbs y e2) right) ++ ")"
             where right = (i - (abstractionCount (LamAbs x e1) 0))
-                  bLastAbs = right == 1
+                  bLastAbs = right == (abstractionCount (LamAbs x e2) 0)
 printExpression (LamApp (LamAbs x e) (LamApp e1 e2)) i = "(" ++ (printExpression (LamAbs x e) i) ++ ")" ++  " " ++ "(" ++ (printExpression (LamApp e1 e2) right) ++ ")"
-            where right = (i - (abstractionCount (LamAbs x e) 0))
+            where right = abstractionCount (LamApp e1 e2) 0
 printExpression (LamApp e (LamApp e1 e2)) i = (printExpression e i) ++ " " ++ "(" ++ (printExpression (LamApp e1 e2) right) ++ ")"
-            where right = (i - (abstractionCount e 0))
+            where right = abstractionCount (LamApp e1 e2) 0
 printExpression (LamApp (LamAbs x e) e2) i = "(" ++ (printExpression (LamAbs x e) i) ++ ")" ++ " " ++ (printExpression e2 right)
             where right = (i - (abstractionCount (LamAbs x e) 0))
 printExpression (LamApp e1 (LamAbs x e)) i | bLastAbs  = (printExpression e1 i) ++ " " ++ (printExpression (LamAbs x e) right)
                                            | otherwise = (printExpression e1 i) ++ " " ++ "(" ++ (printExpression (LamAbs x e) right) ++ ")"
             where right = (i - (abstractionCount e1 0))
-                  bLastAbs = right == 1
+                  bLastAbs = right == (abstractionCount (LamAbs x e) 0)
 printExpression (LamApp e1 e2) i = (printExpression e1 i) ++ " " ++ (printExpression e2 right)
             where right = (i - (abstractionCount e1 0))
 printExpression (LamAbs x e) i = "\\x" ++ (show x) ++ " -> " ++ (printExpression e (i - 1))

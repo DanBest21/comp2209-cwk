@@ -41,12 +41,9 @@ simpleTests =
         countAllReds (LamApp (LamAbs 0 (LamVar 0)) (LamAbs 1 (LamVar 1))) 0 == 0,
         countAllReds (LamApp (LamAbs 0 (LamVar 0)) (LamAbs 1 (LamVar 1))) 1 == 0,
         countAllReds (LamApp (LamAbs 0 (LamVar 0)) (LamAbs 1 (LamVar 1))) 2 == 1,
-        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))
-           (LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 2 == 0,
-        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))
-           (LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 3 == 1,
-        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))
-           (LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 4 == 3
+        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 2 == 0,
+        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 3 == 1,
+        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 4 == 3
       ],
       [ -- Challenge 3 (but note that additional spaces will be accepted)
         printLambda (LamApp (LamVar 2) (LamVar 1)) == "x2 x1",
@@ -57,12 +54,20 @@ simpleTests =
         printLambda (LamAbs 1 (LamAbs 2 (LamVar 1))) == "0",
         printLambda (LamAbs 1 (LamAbs 1 (LamApp (LamVar 1) (LamAbs 1 (LamAbs 2 (LamVar 1)))))) == "1",
         -- Additional tests
-        printLambda (LamAbs 1 (LamAbs 1 (LamApp (LamVar 1) (LamAbs 1 (LamAbs 2 (LamApp (LamVar 2) (LamAbs 2 (LamAbs 3 (LamVar 4))))))))) == "2",
+        printLambda (LamAbs 1 (LamAbs 1 (LamApp (LamVar 1) (LamAbs 1 (LamAbs 2 (LamApp (LamVar 2) (LamAbs 2 (LamAbs 3 (LamVar 2))))))))) == "2",
+        printLambda (LamAbs 1 (LamAbs 1 (LamApp (LamVar 1) (LamAbs 1 (LamAbs 2 (LamApp (LamVar 2) (LamAbs 2 (LamAbs 3 (LamVar 4))))))))) ==
+          "\\x1 -> \\x1 -> x1 \\x1 -> \\x2 -> x2 \\x2 -> \\x3 -> x4",
         printLambda (LamApp (LamApp (LamVar 0) (LamVar 1)) (LamVar 2)) == "x0 x1 x2",
         printLambda (LamApp (LamVar 0) (LamApp (LamVar 1) (LamVar 2))) == "x0 (x1 x2)",
         printLambda (LamApp (LamApp (LamAbs 0 (LamVar 0))  (LamAbs 1 (LamVar 1))) (LamAbs 2 (LamVar 2))) == "(\\x0 -> x0) (\\x1 -> x1) \\x2 -> x2",
         printLambda (LamApp (LamAbs 0 (LamVar 0)) (LamApp (LamAbs 1 (LamVar 1)) (LamAbs 2 (LamVar 2)))) == "(\\x0 -> x0) ((\\x1 -> x1) \\x2 -> x2)",
-        printLambda (LamApp (LamApp (LamVar 0) (LamApp (LamAbs 1 (LamVar 1)) (LamAbs 2 (LamVar 2)))) (LamAbs 3 (LamVar 3))) == "x0 ((\\x1 -> x1) (\\x2 -> x2)) \\x3 -> x3"
+        printLambda (LamApp (LamApp (LamVar 0) (LamApp (LamAbs 1 (LamVar 1)) (LamAbs 2 (LamVar 2)))) (LamAbs 3 (LamVar 3))) == "x0 ((\\x1 -> x1) \\x2 -> x2) \\x3 -> x3",
+        printLambda (LamAbs 0 (LamAbs 1 (LamApp (LamApp (LamVar 0) (LamVar 1)) (LamVar 0)))) == "\\x0 -> \\x1 -> x0 x1 x0",
+        printLambda (LamAbs 0 (LamAbs 1 (LamApp (LamVar 0) (LamApp (LamVar 1) (LamVar 0))))) == "\\x0 -> \\x1 -> x0 (x1 x0)",
+        printLambda (LamAbs 1 (LamAbs 2 (LamAbs 3 (LamAbs 4 (LamApp (LamVar 1) (LamApp (LamApp (LamVar 1) (LamVar 2)) (LamAbs 1 (LamVar 2)))))))) == 
+            "\\x1 -> \\x2 -> \\x3 -> \\x4 -> x1 (x1 x2 \\x1 -> x2)",
+        printLambda (LamAbs 1 (LamAbs 2 (LamApp (LamVar 1) (LamApp (LamApp (LamVar 11) (LamApp (LamAbs 3 (LamVar 5)) (LamAbs 2 (LamVar 2)) )) (LamAbs 1 (LamApp (LamAbs 3 (LamVar 3)) (LamAbs 4 (LamVar 4)))))))) ==
+            "\\x1 -> \\x2 -> x1 (x11 ((\\x3 -> x5) \\x2 -> x2) \\x1 -> (\\x3 -> x3) \\x4 -> x4)"
       ],
       [ -- Challenge 4
         parseLet "let x1 = x2" == Nothing,
