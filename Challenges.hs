@@ -1,15 +1,13 @@
 -- COMP2209 Functional Programming Challenges
 -- (c) Daniel Best, University of Southampton 2019
--- Skeleton code to be updated with your solutions
--- The dummy functions here simply return a random value that is usually wrong 
 
--- DO NOT MODIFY THE FOLLOWING LINES OF CODE
 module Challenges (alphaNorm, countAllReds, printLambda, parseLet, letToLambda,
     LamExpr(LamApp, LamAbs, LamVar), LetExpr(LetApp, LetDef, LetFun, LetVar, LetNum),
     lambdaToLet) where
 
 -- Import standard library and parsing definitions from Hutton 2016, Chapter 13
 import Data.Char
+import Data.List
 import Parsing
 
 -- abstract data type for simple lambda calculus expressions
@@ -17,11 +15,9 @@ data LamExpr = LamApp LamExpr LamExpr  |  LamAbs Int LamExpr  |  LamVar Int deri
 
 -- abstract data type for simple let expressions
 data LetExpr = LetApp LetExpr LetExpr  |  LetDef [([Int], LetExpr)] LetExpr |  LetFun Int | LetVar Int | LetNum Int deriving (Show, Eq)
--- END OF CODE YOU MUST NOT MODIFY
 
-
--- ADD YOUR OWN CODE HERE
 -- Challenge 1
+
 -- Generate the alpha normal form for a simple lambda calculus expression
 -- each bound variable is chosen to be the first one possible
 
@@ -84,27 +80,29 @@ alphaNorm e = convertToANF e 0
 -- Challenge 2
 -- Count all reduction paths for a given lambda expression m, of length up to a given limit l
 
--- data Direction a = L a (LamExpr a) | R a (LamExpr a) deriving (Show)
--- type Trail a = [Direction a]
--- type Zipper a = (LamExpr a, Trail a) 
+data Direction = L Bool (LamExpr) | R Bool (LamExpr) deriving (Show, Eq)
+type Trail = [Direction]
+type Zipper = (LamExpr, Trail) 
 
--- goLeft, goRight, goUp :: Zipper a -> Zipper a
--- goLeft (LamApp l r, ts) = (l , L x r:ts)
--- goRight (LamApp l r, ts) = (r , R x l:ts)
--- goUp (t , L x r : ts) = (Node x t r , ts)
--- goUp (t , R x l : ts) = (Node x l t , ts)
+goLeft, goRight, goUp :: Zipper -> Zipper
+goLeft (LamApp l r, ts) = (l, L (False) r : ts)
+goRight (LamApp l r, ts) = (r, R (False) l : ts)
+goRight (LamAbs l r, ts) = (r, R (True) (LamVar l) : ts)
+goUp (t, L b r : ts) = (LamApp t r, ts)
+goUp (t, R (False) l : ts) = (LamApp l t, ts)
+goUp (t, R (True) (LamVar l) : ts) = (LamAbs l t, ts)
 
--- goRoot :: Zipper a -> Zipper a
--- goRoot (t, []) = (t, [])
--- goRoot z = goRoot $ goUp z
+goRoot :: Zipper -> Zipper
+goRoot (t, []) = (t, [])
+goRoot z = goRoot $ goUp z
 
 betaConversion :: LamExpr -> Int -> LamExpr -> LamExpr
 betaConversion (LamApp e1 e2) n e = LamApp (betaConversion e1 n e) (betaConversion e2 n e)
 betaConversion (LamAbs x e1) n e | x /= n && not(bFree) = LamAbs x (betaConversion e1 n e)
                                  | x /= n && bFree      = betaConversion (LamAbs free (betaConversion e1 x (LamVar free))) n e
-                                 | otherwise            = LamAbs x e1
-                     where bFree = not(isBound (LamAbs x e) x (False))
-                           free = nextFreeVariable (LamAbs x e) n
+                                 | x == n               = LamAbs x e1
+                     where bFree = isBound e x (True)
+                           free = nextFreeVariable e n
 betaConversion (LamVar x) n e | x == n    = e
                               | otherwise = LamVar x
 
@@ -120,6 +118,10 @@ rightReduction (LamApp e1 e2) = LamApp (e1) (rightReduction e2)
 rightReduction (LamAbs x e) = LamAbs x e
 rightReduction (LamVar x) = LamVar x
 
+handleSingleVariable :: LamExpr -> LamExpr
+handleSingleVariable (LamVar x) = LamVar 0
+handleSingleVariable e = e
+
 convertToBNF :: LamExpr -> LamExpr
 convertToBNF e | isBNF     = e
                | left /= e = convertToBNF left
@@ -127,23 +129,50 @@ convertToBNF e | isBNF     = e
             where left = leftReduction e
                   right = rightReduction e
                   isBNF = (e == left) && (e == right)
-      
-reductionsToLimit :: LamExpr -> LamExpr -> Int -> [LamExpr]
-reductionsToLimit (LamApp e1 e2) e n | n == 0    = []
-                                     | n == 1    = [e]
-                                     | otherwise = reductionsToLimit left left (n - 1) ++ reductionsToLimit right right (n - 1) ++ [(LamApp (head $ reductionsToLimit e1 e n) (e2))] ++ [(LamApp (e1) (head $ reductionsToLimit e2 e n))]
-            where left = (leftReduction (LamApp e1 e2))
-                  right = (rightReduction (LamApp e1 e2))
-reductionsToLimit (LamAbs x e1) e n = [(LamAbs x (head $ reductionsToLimit e1 e n))]
-reductionsToLimit (LamVar x) e n = [e] 
 
-countAllReds' :: LamExpr -> Int -> [LamExpr]
-countAllReds' e n = [ x | x <- reductionsToLimit e e n ]
-            where bnf = convertToBNF e
+possibleReductions :: Zipper -> LamExpr -> [Zipper]
+possibleReductions z@(LamApp l r, ts) e | bLeft     = [goRoot(leftReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
+                                        | bRight    = [goRoot(rightReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
+                                        | otherwise = possibleReductions (goLeft z) ++ possibleReductions (goRight z) e
+            where bLeft = (goRoot(leftReduction (LamApp l r), ts) /= goRoot z)
+                  bRight = (goRoot(rightReduction (LamApp l r), ts) /= goRoot z)
+possibleReductions z@(LamAbs x r, ts) e = possibleReductions (goRight z) e
+possibleReductions z e | bBNF      = [goRoot z]
+                       | otherwise = []
+            where bBNF = alphaNorm (convertToBNF e) == 
+
+filterDuplicates :: [Zipper] -> LamExpr -> [Zipper]
+filterDuplicates zs e = [ z | z@(e', ts) <- zs, alphaNorm (e') == bnf ] ++ nub [ z | z@(e', ts) <- zs, alphaNorm (e') /= bnf ]
+            where bnf = alphaNorm (convertToBNF e)
+
+possibleReductionsList :: [Zipper] -> LamExpr -> [Zipper]
+possibleReductionsList (z:[]) e = filterDuplicates (possibleReductions z e) e
+possibleReductionsList (z:zs) e = filterDuplicates (possibleReductions z e) e ++ possibleReductionsList zs e
+
+possibleReductionsToLimit :: [Zipper] -> Int -> LamExpr -> [Zipper]
+possibleReductionsToLimit zs 0 e = []
+possibleReductionsToLimit zs 1 e = zs
+possibleReductionsToLimit zs n e = possibleReductionsToLimit (possibleReductionsList zs e) (n-1) e
+
+-- reductionsToLimit :: LamExpr -> Int -> LamExpr -> [LamExpr]
+-- reductionsToLimit e1 0 e2 = []
+-- reductionsToLimit (LamApp e1 e2) n e | n == 1         = [e]
+--                                      | bEqual         = nub (reductionsToLimit left (n - 1) left ++ [LamApp (head (reductionsToLimit e1 n e)) e2] ++ [LamApp e1 (head (reductionsToLimit e2 n e))])
+--                                      | otherwise      = nub (reductionsToLimit left (n - 1) left ++ reductionsToLimit right (n - 1) right ++ [LamApp (head (reductionsToLimit e1 n e)) e2] ++ [LamApp e1 (head (reductionsToLimit e2 n e))])
+--             where left = leftReduction (LamApp e1 e2)
+--                   right = rightReduction (LamApp e1 e2)
+--                   bEqual = alphaNorm left == alphaNorm right
+-- reductionsToLimit (LamAbs x e1) n e | n == 1    = [e]
+--                                     | otherwise = [LamAbs x (head (reductionsToLimit e1 n e))]
+-- reductionsToLimit (LamVar x) n e | n == 1    = [e]
+--                                  | otherwise = [LamVar x]
+
+-- countAllReds' :: LamExpr -> Int -> [LamExpr]
+-- countAllReds' e n = [ handleSingleVariable (alphaNorm x) | x <- reductionsToLimit e n e ]
 
 countAllReds :: LamExpr -> Int -> Int
-countAllReds e n = length [ x | x <- reductionsToLimit e e n, x == bnf ]
-            where bnf = convertToBNF e
+countAllReds e n = (-1) -- length [ handleSingleVariable (alphaNorm x) | x <- reductionsToLimit e n e, handleSingleVariable x == bnf ]
+            where bnf = handleSingleVariable (alphaNorm (convertToBNF e))
 
 -- Challenge 3 
 -- Pretty print a lambda expression, combining abstraction variables
