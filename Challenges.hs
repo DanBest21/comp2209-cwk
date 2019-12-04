@@ -109,13 +109,13 @@ betaConversion (LamVar x) n e | x == n    = e
 leftReduction :: LamExpr -> LamExpr
 leftReduction (LamApp (LamAbs x e) e2) = betaConversion e x e2
 leftReduction (LamApp e1 e2) = LamApp (leftReduction e1) (e2)
-leftReduction (LamAbs x e) = LamAbs x e
+leftReduction (LamAbs x e) = LamAbs x (leftReduction e)
 leftReduction (LamVar x) = LamVar x
 
 rightReduction :: LamExpr -> LamExpr
 rightReduction (LamApp (LamAbs x e) e2) = betaConversion e x e2
 rightReduction (LamApp e1 e2) = LamApp (e1) (rightReduction e2)
-rightReduction (LamAbs x e) = LamAbs x e
+rightReduction (LamAbs x e) = LamAbs x (rightReduction e)
 rightReduction (LamVar x) = LamVar x
 
 handleSingleVariable :: LamExpr -> LamExpr
@@ -134,8 +134,14 @@ extractExpression :: Zipper -> LamExpr
 extractExpression (e, ts) = alphaNorm e
 
 possibleReductions :: Zipper -> LamExpr -> [Zipper]
-possibleReductions z@(LamApp l r, ts) e | bLeft     = [goRoot(leftReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
-                                        | bRight    = [goRoot(rightReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
+possibleReductions z@(LamApp (LamVar x) (LamVar y), ts) e | bBNF      = [root]
+                                                          | otherwise = []
+            where bnf = alphaNorm (convertToBNF e)
+                  root = goRoot z
+                  rootExp = extractExpression root
+                  bBNF = (rootExp == bnf)
+possibleReductions z@(LamApp l r, ts) e | bLeft     = [goRoot(leftReduction (LamApp l r), ts)] ++ possibleReductions (goRight z) e
+                                        | bRight    = [goRoot(rightReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e
                                         | otherwise = possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
             where bLeft = (goRoot(leftReduction (LamApp l r), ts) /= goRoot z)
                   bRight = (goRoot(rightReduction (LamApp l r), ts) /= goRoot z)
@@ -145,7 +151,7 @@ possibleReductions z e | bBNF      = [root]
             where bnf = alphaNorm (convertToBNF e)
                   root = goRoot z
                   rootExp = extractExpression root
-                  bBNF = rootExp == bnf
+                  bBNF = (rootExp == bnf)
 
 filterDuplicates :: [Zipper] -> LamExpr -> [Zipper]
 filterDuplicates zs e = [ z | z@(e', ts) <- zs, alphaNorm (e') == bnf ] ++ nub [ z | z@(e', ts) <- zs, alphaNorm (e') /= bnf ]
@@ -160,8 +166,12 @@ possibleReductionsToLimit zs 0 e = []
 possibleReductionsToLimit zs 1 e = zs
 possibleReductionsToLimit zs n e = possibleReductionsToLimit (possibleReductionsList zs e) (n-1) e
 
+countAllReds'' :: LamExpr -> Int -> [Zipper]
+countAllReds'' e n = possibleReductionsToLimit [(e, [])] n e
+            where bnf = handleSingleVariable (alphaNorm (convertToBNF e))
+
 countAllReds' :: LamExpr -> Int -> [LamExpr]
-countAllReds' e n = [ handleSingleVariable (alphaNorm x) | (x, ts) <- possibleReductionsToLimit [(e, [])] n e, handleSingleVariable (alphaNorm x) == bnf ]
+countAllReds' e n = [ handleSingleVariable (alphaNorm x) | (x, ts) <- possibleReductionsToLimit [(e, [])] n e ]
             where bnf = handleSingleVariable (alphaNorm (convertToBNF e))
 
 countAllReds :: LamExpr -> Int -> Int

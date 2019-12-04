@@ -43,7 +43,11 @@ simpleTests =
         countAllReds (LamApp (LamAbs 0 (LamVar 0)) (LamAbs 1 (LamVar 1))) 2 == 1,
         countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 2 == 0,
         countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 3 == 1,
-        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 4 == 3
+        countAllReds (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamVar 0))) (LamVar 3))(LamApp (LamAbs 4 (LamVar 4)) (LamVar 5))) 4 == 3,
+        -- Additional tests
+        countAllReds (LamAbs 0 (LamAbs 5 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamAbs 2 (LamVar 2))(LamVar 0))(LamApp (LamAbs 3 (LamVar 4))(LamVar 3))))))) 2 == 0,
+        countAllReds (LamAbs 0 (LamAbs 5 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamAbs 2 (LamVar 2))(LamVar 0))(LamApp (LamAbs 3 (LamVar 4))(LamVar 3))))))) 3 == 2,
+        countAllReds (LamAbs 0 (LamAbs 5 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamAbs 2 (LamVar 2))(LamVar 0))(LamApp (LamAbs 3 (LamVar 4))(LamVar 3))))))) 4 == 2
       ],
       [ -- Challenge 3 (but note that additional spaces will be accepted)
         printLambda (LamApp (LamVar 2) (LamVar 1)) == "x2 x1",
