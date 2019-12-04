@@ -134,12 +134,7 @@ extractExpression :: Zipper -> LamExpr
 extractExpression (e, ts) = alphaNorm e
 
 possibleReductions :: Zipper -> LamExpr -> [Zipper]
-possibleReductions z@(LamApp (LamVar x) (LamVar y), ts) e | bBNF      = [root]
-                                                          | otherwise = []
-            where bnf = alphaNorm (convertToBNF e)
-                  root = goRoot z
-                  rootExp = extractExpression root
-                  bBNF = (rootExp == bnf)
+possibleReductions z@(LamApp (LamVar x) r, ts) e = possibleReductions (goRight z) e 
 possibleReductions z@(LamApp l r, ts) e | bLeft     = [goRoot(leftReduction (LamApp l r), ts)] ++ possibleReductions (goRight z) e
                                         | bRight    = [goRoot(rightReduction (LamApp l r), ts)] ++ possibleReductions (goLeft z) e
                                         | otherwise = possibleReductions (goLeft z) e ++ possibleReductions (goRight z) e
