@@ -46,8 +46,7 @@ alphaConversion (LamVar x) n m | x == m    = LamVar n
                                | otherwise = LamVar x 
 
 -- Convert an expression to ANF, handling each case for LamAbs accordingly:
--- - In the case that x == n but x isn't bound to anything, then leave it as it is.
--- - Otherwise, in all other cases x == n, then we need to increase the value of n by 1 for later conversions.
+-- - In the case that x == n, then leave it as it is.
 -- - If x /= n, but x is bound to a value and n is already bound to something else, perform an alpha conversion that handles both accordingly.
 -- - If x /= n, but x is bound to a value, then perform an alpha conversion, changing any value bound to this LamAbs.
 -- - Else, if n is a free value, then perform an alpha conversion, changing any instance of that value to the next free value.
@@ -61,10 +60,9 @@ convertToANF (LamApp e1 e2) n | bIsBound1 && bIsBound2 = LamApp (convertToANF e1
                         where bIsBound1 = isBound e1 0 (False)
                               bIsBound2 = isBound e2 0 (False)
                               free = (nextFreeVariable (LamApp e1 e2) 0)
-convertToANF (LamAbs x e) n | x == n && not(bBoundOld) = LamAbs x (convertToANF e n)
-                            | x == n                   = LamAbs x (convertToANF e (n + 1))
-                            | bBoundOld && bBoundNew   = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) (n + 1))
-                            | bBoundOld                = LamAbs n (convertToANF (alphaConversion e n x) (n + 1))
+convertToANF (LamAbs x e) n | x == n                   = LamAbs x (convertToANF e n)
+                            | bBoundOld && bBoundNew   = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) n)
+                            | bBoundOld                = LamAbs n (convertToANF (alphaConversion e n x) n)
                             | not(bBoundNew)           = LamAbs free (convertToANF (alphaConversion e free x) free)
                             | otherwise                = LamAbs n (convertToANF e n)
                         where bBoundOld = isBound (LamAbs x e) x (False)
