@@ -34,13 +34,13 @@ isBound (LamVar n) x b | x == n && b = True
 isFree :: LamExpr -> Int -> Bool
 isFree (LamApp e1 e2) x = (isFree e1 x) || (isFree e2 x)
 isFree (LamAbs n e) x | x == n = False
-                        | x /= n = isFree e x
+                      | x /= n = isFree e x
 isFree (LamVar n) x = x == n
 
 -- Find the next free variable value, also considering free variables.
 nextFreeVariable :: LamExpr -> Int -> Int
-nextFreeVariable e n | isFree e n  = nextFreeVariable e (n+1)
-                     | otherwise          = n
+nextFreeVariable e n | isFree e n = nextFreeVariable e (n+1)
+                     | otherwise  = n
 
 -- Perform an alpha conversion on the given m value, changing it to the value of n when found in a LamVar.
 -- Ensure that any LamAbs that has this new n value is changed to m (these will be unbound), and vice versa.
