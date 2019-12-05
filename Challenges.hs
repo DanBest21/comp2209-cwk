@@ -55,18 +55,18 @@ alphaConversion (LamVar x) n m | x == m    = LamVar n
 -- Also check the LamApp to see if that value is already bound, in which case we want to pass the next free value across both expressions instead.
 convertToANF :: LamExpr -> Int -> LamExpr
 convertToANF (LamApp e1 e2) n | bIsBound1 && bIsBound2 = LamApp (convertToANF e1 free) (convertToANF e2 free)
-                              | bIsBound1              = LamApp (convertToANF e1 n) (convertToANF e2 free)
-                              | bIsBound2              = LamApp (convertToANF e1 free) (convertToANF e2 n)
-                              | otherwise              = LamApp (convertToANF e1 n) (convertToANF e2 n)
-                        where bIsBound1 = isBound e1 n (False)
-                              bIsBound2 = isBound e2 n (False)
-                              free = (nextFreeVariable (LamApp e1 e2) n)
+                              | bIsBound1              = LamApp (convertToANF e1 0) (convertToANF e2 free)
+                              | bIsBound2              = LamApp (convertToANF e1 free) (convertToANF e2 0)
+                              | otherwise              = LamApp (convertToANF e1 0) (convertToANF e2 0)
+                        where bIsBound1 = isBound e1 0 (False)
+                              bIsBound2 = isBound e2 0 (False)
+                              free = (nextFreeVariable (LamApp e1 e2) 0)
 convertToANF (LamAbs x e) n | x == n && not(bBoundOld) = LamAbs x (convertToANF e n)
                             | x == n                   = LamAbs x (convertToANF e (n + 1))
                             | bBoundOld && bBoundNew   = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) (n + 1))
                             | bBoundOld && bSecond     = LamAbs n (convertToANF (alphaConversion e n x) n)
                             | bBoundOld                = LamAbs n (convertToANF (alphaConversion e n x) (n + 1))
-                            | not(bBoundNew)           = LamAbs n (convertToANF (alphaConversion e free n) free)
+                            | not(bBoundNew)           = LamAbs free (convertToANF (alphaConversion e free x) free)
                             | otherwise                = LamAbs n (convertToANF e n)
                         where bBoundOld = isBound (LamAbs x e) x (False)
                               bBoundNew = isBound (LamAbs x e) n (False)
@@ -223,69 +223,122 @@ printLambda e | scottEncoding == -1 = printExpression e (abstractionCount e 0)
 -- Challenge 4
 -- Parse recursive let expression, possibly containing numerals
 
--- TEMP *************************************************************
--- varExp :: Parser BExp
--- varExp = do s <- ident
---             return (Var s)
+digitExp :: Parser Char
+digitExp = do d <- digit
+              return d
 
--- truExp :: Parser BExp
--- truExp = do symbol "T"
---             return (Tru)
- 
--- flsExp :: Parser BExp
--- flsExp = do symbol "F" 
---             return (Fls)
-
--- andExp :: Parser BExp
--- andExp = do e1 <- lowerExpr
---             symbol "&" 
---             e2 <- expr
---             return (And e1 e2)
-
--- orExp :: Parser BExp
--- orExp = do e1 <- evenLowerExpr
---            symbol "|"
---            e2 <- lowerExpr
---            return (Or e1 e2)
--- ****************************************************************
-
--- digitExp :: Parser Char
--- digitExp = do d <- digit
---               return d
-
--- digitsExp :: Parser [Char]
--- digitsExp = some digitExp
+digitsExp :: Parser [Char]
+digitsExp = do ds <- some digitExp
+               return ds
 
 numExp :: Parser LetExpr
-numExp = do n <- nat
-            return (LetNum n)
+numExp = do n <- digitsExp
+            return (LetNum (read n))
 
 varExp :: Parser LetExpr
-varExp = do char 'x'
-            n <- nat
-            return (LetVar n)
+varExp = do space
+            char 'x'
+            n <- digitsExp
+            space
+            return (LetVar (read n))
+      
+varExp' :: Parser Int
+varExp' = do space
+             char 'x'
+             n <- digitsExp
+             space
+             return (read n)
+
+varListExp :: Parser [LetExpr]
+varListExp = do vs <- some varExp
+                return vs
+
+varListExp' :: Parser [Int]
+varListExp' = do vs <- some varExp'
+                 return vs
 
 funExp :: Parser LetExpr
-funExp = do char 'f'
-            n <- nat
-            return (LetFun n)
+funExp = do space
+            char 'f'
+            n <- digitsExp
+            space
+            return (LetFun (read n))
 
--- varListExp :: Parser LetExpr
--- varListExp = 
+funExp' :: Parser Int
+funExp' = do space
+             char 'f'
+             n <- digitsExp
+             space
+             return (read n)
 
--- expr :: Parser LetExpr
--- expr = 
+eqnExp :: Parser [([Int], LetExpr)]
+eqnExp = do f <- funExp'
+            vs <- varListExp'
+            space
+            char '='
+            space
+            e <- expr
+            return [(([f] ++ vs), e)]
+
+eqnListExp :: Parser [([Int], LetExpr)]
+eqnListExp = do e <- eqnExp
+                char ';'
+                space
+                es <- eqnListExp
+                return (e ++ es)
+            <|> eqnExp
+
+letExp :: Parser LetExpr
+letExp = do string "let"
+            space
+            es <- eqnListExp
+            space
+            string "in"
+            e <- expr
+            return (LetDef es e)
+
+-- Taken from Graham Hutton and Erik Meijer
+chainl :: Parser a -> Parser (a -> a -> a) -> a -> Parser a
+chainl p op a = (p `chainl1` op) <|> return a
+
+chainl1 :: Parser a -> Parser (a -> a -> a) -> Parser a
+p `chainl1` op = do {a <- p; rest a}
+      where rest a = do f <- op 
+                        b <- p
+                        rest (f a b)
+                        <|> return a
+            
+bracketExp :: Parser LetExpr
+bracketExp = do symbol "("
+                e <- expr1
+                symbol ")"
+                return e
+      
+appExp :: Parser LetExpr
+appExp = do e1 <- expr2
+            e2 <- expr
+            return (LetApp e1 e2)
+
+expr :: Parser LetExpr
+expr = bracketExp <|> expr1
+expr1 = appExp <|> expr2
+expr2 = letExp <|> expr3
+expr3 = funExp <|> varExp <|> numExp
+
+parseLetExp :: Parser LetExpr -> String -> Maybe LetExpr
+parseLetExp p s =
+      case parse p s of
+            [(res,rs)] -> Just res
+            [] -> Nothing
 
 parseLet :: String -> Maybe LetExpr
--- parseLet = fst . head . (parse expr)
-parseLet _ = Just (LetVar (-1))
+parseLet s = parseLetExp expr s
 
 -- Challenge 5
 -- Translate a let expression into lambda calculus, using Scott numerals
 -- convert let symbols to lambda variables using Jansen's techniques rather than Y
 letToLambda :: LetExpr -> LamExpr
 letToLambda _ = LamVar (-1)
-
 
 -- Challenge 6
 -- Convert a lambda calculus expression into one using let expressions and application
