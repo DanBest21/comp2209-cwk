@@ -30,9 +30,16 @@ isBound (LamAbs n e) x b | x == n || b == True = isBound e x (True)
 isBound (LamVar n) x b | x == n && b = True
                        | otherwise   = False
 
+-- Function adapted from the "free" function shown during the lecture on Interpreters (Subsitution) - (c) Julian Rathke, University of Southampton 2019 
+isFree :: LamExpr -> Int -> Bool
+isFree (LamApp e1 e2) x = (isFree e1 x) || (isFree e2 x)
+isFree (LamAbs n e) x | x == n = False
+                        | x /= n = isFree e x
+isFree (LamVar n) x = x == n
+
 -- Find the next free variable value, also considering free variables.
 nextFreeVariable :: LamExpr -> Int -> Int
-nextFreeVariable e n | isBound e n (True) = nextFreeVariable e (n+1)
+nextFreeVariable e n | isFree e n  = nextFreeVariable e (n+1)
                      | otherwise          = n
 
 -- Perform an alpha conversion on the given m value, changing it to the value of n when found in a LamVar.
@@ -53,12 +60,12 @@ alphaConversion (LamVar x) n m | x == m    = LamVar n
 -- - Otherwise, n is a free value, and we are free to simply change this value to it.
 -- Also check the LamApp to see if that value is already bound, in which case we want to pass the next free value across both expressions instead.
 convertToANF :: LamExpr -> Int -> LamExpr
-convertToANF (LamApp e1 e2) n | bIsBound1 && bIsBound2 = LamApp (convertToANF e1 free) (convertToANF e2 free)
-                              | bIsBound1              = LamApp (convertToANF e1 0) (convertToANF e2 free)
-                              | bIsBound2              = LamApp (convertToANF e1 free) (convertToANF e2 0)
-                              | otherwise              = LamApp (convertToANF e1 0) (convertToANF e2 0)
-                        where bIsBound1 = isBound e1 0 (False)
-                              bIsBound2 = isBound e2 0 (False)
+convertToANF (LamApp e1 e2) n | bIsFree1 && bIsFree2 = LamApp (convertToANF e1 free) (convertToANF e2 free)
+                              | bIsFree1             = LamApp (convertToANF e1 0) (convertToANF e2 free)
+                              | bIsFree2             = LamApp (convertToANF e1 free) (convertToANF e2 0)
+                              | otherwise            = LamApp (convertToANF e1 0) (convertToANF e2 0)
+                        where bIsFree1 = isFree e1 0
+                              bIsFree2 = isFree e2 0
                               free = (nextFreeVariable (LamApp e1 e2) 0)
 convertToANF (LamAbs x e) n | x == n                   = LamAbs x (convertToANF e n)
                             | bBoundOld && bBoundNew   = LamAbs n (convertToANF (alphaConversion (alphaConversion e free n) n x) n)
@@ -100,7 +107,7 @@ betaConversion (LamApp e1 e2) n e = LamApp (betaConversion e1 n e) (betaConversi
 betaConversion (LamAbs x e1) n e | x /= n && not(bFree) = LamAbs x (betaConversion e1 n e)
                                  | x /= n && bFree      = betaConversion (LamAbs free (betaConversion e1 x (LamVar free))) n e
                                  | x == n               = LamAbs x e1
-                     where bFree = isBound e x (True)
+                     where bFree = isFree e x
                            free = nextFreeVariable e n
 betaConversion (LamVar x) n e | x == n    = e
                               | otherwise = LamVar x
