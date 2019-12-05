@@ -174,7 +174,8 @@ possibleReductionsToLimit zs n e = possibleReductionsToLimit (possibleReductions
 
 -- Counts the length of the list to determine the number of reduction paths to BNF.
 countAllReds :: LamExpr -> Int -> Int
-countAllReds e n = length [ handleSingleVariable (alphaNorm x) | (x, ts) <- possibleReductionsToLimit [(e, [])] n e, handleSingleVariable (alphaNorm x) == bnf ]
+countAllReds e n | n < 0     = error "The value of n cannot be negative!"
+                 | otherwise = length [ handleSingleVariable (alphaNorm x) | (x, ts) <- possibleReductionsToLimit [(e, [])] n e, handleSingleVariable (alphaNorm x) == bnf ]
             where bnf = handleSingleVariable (alphaNorm (convertToBNF e))
 
 -- Challenge 3 

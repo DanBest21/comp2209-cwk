@@ -34,7 +34,8 @@ simpleTests =
         alphaNorm (LamAbs 0 (LamAbs 5 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamAbs 2 (LamVar 2))(LamVar 0))(LamApp (LamAbs 3 (LamVar 4))(LamVar 3))))))) ==
             LamAbs 0 (LamAbs 1 (LamAbs 1 (LamAbs 1 (LamApp (LamApp (LamAbs 0 (LamVar 0)) (LamVar 0)) (LamApp (LamAbs 0 (LamVar 4)) (LamVar 3)))))),
         alphaNorm (LamAbs 2 (LamApp (LamVar 1) (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamVar 0)))))) ==    
-            LamAbs 0 (LamApp (LamVar 1) (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamVar 0)))))    
+            LamAbs 0 (LamApp (LamVar 1) (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamVar 0))))),   
+        alphaNorm (LamAbs 0 (LamAbs 0 (LamVar 0))) == (LamAbs 0 (LamAbs 0 (LamVar 0)))
       ],
       [ -- Challenge 2
         countAllReds (LamAbs 0 (LamAbs 1 (LamVar 1))) 0 == 0,
