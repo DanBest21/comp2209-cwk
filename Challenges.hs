@@ -356,8 +356,42 @@ parseLet s = parseLetExp expr s
 -- Challenge 5
 -- Translate a let expression into lambda calculus, using Scott numerals
 -- convert let symbols to lambda variables using Jansen's techniques rather than Y
+
+formExpression :: [Int] -> LetExpr -> LamExpr
+formExpression (x:xs) e = LamAbs x (formExpression xs e)
+formExpression [] e = convertLetToLambda e
+
+-- performSubstitution :: LetExpr -> LamExpr -> Int -> LamExpr
+-- performSubstitution e@(LetDef ((xs, e1):[]) (e2)) f | expr == f = LamApp (expr) (expr)
+--                                                    | otherwise = expr
+--             where expr = alphaNorm (formExpression xs e2)
+-- performSubstitution e@(LetApp e1 e2) f = LamApp (performSubstitution e1 f) (performSubstitution e2 f)
+-- performSubstitution e@(LetFun x) f | expr == f = LamApp (expr) (expr)
+--                                    | otherwise = expr
+--             where expr = LamVar x
+-- performSubstitution e@(LetVar x) f = LamVar x
+-- performSubstitution e@(LetNum x) f = LamVar x
+
+subst :: LamExpr -> Int -> LamExpr -> LamExpr
+subst (LamVar x) y e | x == y = e
+                     | x /= y = LamVar x
+subst (LamAbs x e1) y e | x /= y && not (isFree e x)      = LamAbs x (subst e1 y e)
+                        | x /= y && (isFree e x) = let x' = nextFreeVariable e x in subst (LamAbs x' (subst e1 x (LamVar x'))) y e
+                        | x == y                          = LamAbs x e
+subst (LamApp e1 e2) y e = LamApp (subst e1 y e) (subst e2 y e) 
+
+convertLetToLambda :: LetExpr -> LamExpr
+convertLetToLambda (LetDef ((x:xs, e1):[]) (e2)) = subst (convertLetToLambda e2) x (LamApp f' f')
+            where f = formExpression (x:xs) (e1)
+                  e = convertLetToLambda e1
+                  f' = subst f x (LamApp e e) 
+convertLetToLambda (LetApp e1 e2) = LamApp (convertLetToLambda e1) (convertLetToLambda e2)
+convertLetToLambda (LetVar x) = LamVar x
+convertLetToLambda (LetFun x) = LamVar x
+convertLetToLambda (LetNum x) = LamVar x
+
 letToLambda :: LetExpr -> LamExpr
-letToLambda _ = LamVar (-1)
+letToLambda e = convertLetToLambda e
 
 -- Challenge 6
 -- Convert a lambda calculus expression into one using let expressions and application

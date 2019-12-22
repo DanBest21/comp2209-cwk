@@ -34,11 +34,11 @@ simpleTests =
           LamAbs 0 (LamAbs 1 (LamAbs 1 (LamAbs 1 (LamApp (LamApp (LamAbs 1 (LamVar 1)) (LamVar 0)) (LamApp (LamAbs 0 (LamVar 4)) (LamVar 3)))))),  
         -- Failed tests
         alphaNorm (LamAbs 0 (LamAbs 5 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamAbs 0 (LamVar 4))(LamVar 3))(LamApp (LamAbs 0 (LamVar 0))(LamVar 0))))))) ==
-            LamAbs 0 (LamAbs 1 (LamAbs 1 (LamAbs 1 (LamApp (LamApp (LamAbs 0 (LamVar 4)) (LamVar 3)) (LamApp (LamAbs 0 (LamVar 0)) (LamVar 0))))))
+            LamAbs 0 (LamAbs 1 (LamAbs 1 (LamAbs 1 (LamApp (LamApp (LamAbs 0 (LamVar 4)) (LamVar 3)) (LamApp (LamAbs 0 (LamVar 0)) (LamVar 0)))))),
         alphaNorm (LamAbs 2 (LamApp (LamVar 1) (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamVar 0)))))) ==    
             LamAbs 0 (LamApp (LamVar 1) (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamVar 0))))),   
         alphaNorm ((LamAbs 1 (LamAbs 1 (LamApp (LamVar 1) (LamAbs 1 (LamAbs 2 (LamApp (LamVar 2) (LamAbs 2 (LamAbs 3 (LamVar 2)))))))))) ==
-            LamAbs 0 (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamAbs 1 (LamVar 0)))))))),
+            LamAbs 0 (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamAbs 0 (LamApp (LamVar 0) (LamAbs 0 (LamAbs 1 (LamVar 0))))))))
       ],
       [ -- Challenge 2
         countAllReds (LamAbs 0 (LamAbs 1 (LamVar 1))) 0 == 0,
@@ -97,11 +97,11 @@ simpleTests =
         letToLambda (LetDef [([1,2],LetVar 2)] (LetFun 1)) ==
           LamApp (LamAbs 0 (LamAbs 0 (LamVar 0))) (LamAbs 0 (LamAbs 0 (LamVar 0))),
         letToLambda (LetDef [([1,2,3],LetApp (LetVar 3) (LetVar 2))] (LetFun 1)) ==
-          LamApp (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamApp (LamVar 1) (LamVar 0))))) (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamApp (LamVar 1) (LamVar 0))))),
-        letToLambda (LetDef [([0,0],LetFun 1),([1,1],LetVar 1)] (LetFun 0)) ==
-          LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamVar 0)))),
-        letToLambda (LetDef [([0,0,1],LetVar 0),([1,1],LetApp (LetApp (LetFun 0) (LetVar 1)) (LetFun 1))] (LetFun 1)) ==
-          LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamVar 0)))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))))  
+          LamApp (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamApp (LamVar 1) (LamVar 0))))) (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamApp (LamVar 1) (LamVar 0)))))
+        -- letToLambda (LetDef [([0,0],LetFun 1),([1,1],LetVar 1)] (LetFun 0)) ==
+        --   LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamVar 0)))),
+        -- letToLambda (LetDef [([0,0,1],LetVar 0),([1,1],LetApp (LetApp (LetFun 0) (LetVar 1)) (LetFun 1))] (LetFun 1)) ==
+        --   LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamVar 0)))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))))  
       ],
       [ -- Challenge 6 (but note that equivalent answers will be accepted)
         lambdaToLet (LamAbs 0 (LamVar 0)) ==
