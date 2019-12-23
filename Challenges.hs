@@ -359,18 +359,8 @@ parseLet s = parseLetExp expr s
 
 formExpression :: [Int] -> LetExpr -> LamExpr
 formExpression (x:xs) e = LamAbs x (formExpression xs e)
-formExpression [] e = convertLetToLambda e
-
--- performSubstitution :: LetExpr -> LamExpr -> Int -> LamExpr
--- performSubstitution e@(LetDef ((xs, e1):[]) (e2)) f | expr == f = LamApp (expr) (expr)
---                                                    | otherwise = expr
---             where expr = alphaNorm (formExpression xs e2)
--- performSubstitution e@(LetApp e1 e2) f = LamApp (performSubstitution e1 f) (performSubstitution e2 f)
--- performSubstitution e@(LetFun x) f | expr == f = LamApp (expr) (expr)
---                                    | otherwise = expr
---             where expr = LamVar x
--- performSubstitution e@(LetVar x) f = LamVar x
--- performSubstitution e@(LetNum x) f = LamVar x
+formExpression [] e = e'
+            where e' = convertLetToLambda e (retrieveExprIds e)
 
 subst :: LamExpr -> Int -> LamExpr -> LamExpr
 subst (LamVar x) y e | x == y = e
@@ -378,20 +368,55 @@ subst (LamVar x) y e | x == y = e
 subst (LamAbs x e1) y e | x /= y && not (isFree e x)      = LamAbs x (subst e1 y e)
                         | x /= y && (isFree e x) = let x' = nextFreeVariable e x in subst (LamAbs x' (subst e1 x (LamVar x'))) y e
                         | x == y                          = LamAbs x e
-subst (LamApp e1 e2) y e = LamApp (subst e1 y e) (subst e2 y e) 
+subst (LamApp e1 e2) y e = LamApp (subst e1 y e) (subst e2 y e)
 
-convertLetToLambda :: LetExpr -> LamExpr
-convertLetToLambda (LetDef ((x:xs, e1):[]) (e2)) = subst (convertLetToLambda e2) x (LamApp f' f')
+formExpr :: [LamExpr] -> LamExpr
+formExpr es = foldl1 (\e1 -> \e2 -> LamApp (e1) (e2)) es
+
+formVars :: [Int] -> [LamExpr]
+formVars [] = []
+formVars (x:xs) = [LamVar x] ++ (formVars xs)
+
+formExprList :: [Int] -> [Int] -> [LamExpr]
+formExprList [] ys = []
+formExprList (x:xs) ys = [formExpr $ formVars ([x] ++ ys)] ++ formExprList xs ys
+
+parallelSubst' :: LamExpr -> [Int] -> Int -> LamExpr -> LamExpr
+parallelSubst' f [] y e = f
+parallelSubst' f (x:xs) y e | x == y    = parallelSubst' (subst f x e) xs y e
+                            | otherwise = parallelSubst' f xs y e
+
+parallelSubst :: LamExpr -> [Int] -> Int -> [LamExpr] -> LamExpr
+parallelSubst f xs y [] = f
+parallelSubst f xs y (e:es) = parallelSubst (parallelSubst' f xs y e) xs y es
+
+-- parallelFunSubst :: LamExpr -> LamExpr -> [[Int]] -> LamExpr
+
+convertLetToLambda :: LetExpr -> [[Int]] -> LamExpr
+convertLetToLambda (LetDef ((x:xs, e1@(LetFun y)):[]) (e2)) yss = subst (convertLetToLambda e2 yss) x (LamApp f' f')
+            where ys = retrieveFunctionIds yss
+                  f = formExpression (ys ++ xs) (e1)
+                  e = convertLetToLambda e1 yss
+                  f' = parallelSubst f ys x (formExprList ys ys)
+convertLetToLambda (LetDef ((x:xs, e1):[]) (e2)) yss = subst (convertLetToLambda e2 yss) x (LamApp f f)
             where f = formExpression (x:xs) (e1)
-                  e = convertLetToLambda e1
-                  f' = subst f x (LamApp e e) 
-convertLetToLambda (LetApp e1 e2) = LamApp (convertLetToLambda e1) (convertLetToLambda e2)
-convertLetToLambda (LetVar x) = LamVar x
-convertLetToLambda (LetFun x) = LamVar x
-convertLetToLambda (LetNum x) = LamVar x
+convertLetToLambda (LetApp e1 e2) yss = LamApp (convertLetToLambda e1 yss) (convertLetToLambda e2 yss)
+convertLetToLambda (LetVar x) yss = LamVar x
+convertLetToLambda (LetFun x) yss = LamVar x
+convertLetToLambda (LetNum x) yss = LamVar x
+
+retrieveFunctionIds :: [[Int]] -> [Int]
+retrieveFunctionIds ((x:xs):xss) = [x] ++ retrieveFunctionIds xss
+retrieveFunctionIds [] = []
+
+retrieveExprIds :: LetExpr -> [[Int]]
+retrieveExprIds (LetApp e1 e2) = retrieveExprIds e1 ++ retrieveExprIds e2
+retrieveExprIds (LetDef ((xs, e1):[]) (e2)) = [xs] ++ retrieveExprIds e2
+retrieveExprIds (LetDef ((xs, e1):xss) (e2)) = [xs] ++ retrieveExprIds (LetDef (xss) (e2)) ++ retrieveExprIds e1
+retrieveExprIds e = []
 
 letToLambda :: LetExpr -> LamExpr
-letToLambda e = convertLetToLambda e
+letToLambda e = alphaNorm $ convertLetToLambda e (retrieveExprIds e)
 
 -- Challenge 6
 -- Convert a lambda calculus expression into one using let expressions and application
