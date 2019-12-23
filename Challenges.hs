@@ -362,13 +362,23 @@ formExpression (x:xs) e = LamAbs x (formExpression xs e)
 formExpression [] e = e'
             where e' = convertLetToLambda e (retrieveExprIds e)
 
-subst :: LamExpr -> Int -> LamExpr -> LamExpr
-subst (LamVar x) y e | x == y = e
-                     | x /= y = LamVar x
-subst (LamAbs x e1) y e | x /= y && not (isFree e x)      = LamAbs x (subst e1 y e)
-                        | x /= y && (isFree e x) = let x' = nextFreeVariable e x in subst (LamAbs x' (subst e1 x (LamVar x'))) y e
-                        | x == y                          = LamAbs x e
-subst (LamApp e1 e2) y e = LamApp (subst e1 y e) (subst e2 y e)
+markSubst :: LamExpr -> LamExpr
+markSubst (LamApp e1 e2) = LamApp (markSubst (e1)) (markSubst (e2))
+markSubst (LamAbs x e) = LamAbs (x + 10000) (markSubst e)
+markSubst (LamVar x) = LamVar (x + 10000)
+
+unmarkSubst :: LamExpr -> LamExpr
+unmarkSubst (LamApp e1 e2) = LamApp (unmarkSubst (e1)) (unmarkSubst (e2))
+unmarkSubst (LamAbs x e) | x >= 10000 = LamAbs (x - 10000) (unmarkSubst e)
+                         | otherwise = LamAbs x (unmarkSubst e)
+unmarkSubst (LamVar x) | x >= 10000 = LamVar (x - 10000)
+                       | otherwise = LamVar x
+
+varSubst :: LamExpr -> Int -> LamExpr -> LamExpr
+varSubst (LamVar x) y e | x == y = markSubst e
+                        | x /= y = LamVar x
+varSubst (LamAbs x e1) y e = LamAbs x (varSubst e1 y e)            
+varSubst (LamApp e1 e2) y e = LamApp (varSubst e1 y e) (varSubst e2 y e)
 
 formExpr :: [LamExpr] -> LamExpr
 formExpr es = foldl1 (\e1 -> \e2 -> LamApp (e1) (e2)) es
@@ -377,36 +387,49 @@ formVars :: [Int] -> [LamExpr]
 formVars [] = []
 formVars (x:xs) = [LamVar x] ++ (formVars xs)
 
-formExprList :: [Int] -> [Int] -> [LamExpr]
+formExprList :: [Int] -> [Int] -> [(Int, LamExpr)]
 formExprList [] ys = []
-formExprList (x:xs) ys = [formExpr $ formVars ([x] ++ ys)] ++ formExprList xs ys
+formExprList (x:xs) ys = [(x, formExpr $ formVars ([x] ++ ys))] ++ formExprList xs ys
 
-parallelSubst' :: LamExpr -> [Int] -> Int -> LamExpr -> LamExpr
-parallelSubst' f [] y e = f
-parallelSubst' f (x:xs) y e | x == y    = parallelSubst' (subst f x e) xs y e
-                            | otherwise = parallelSubst' f xs y e
+formFuncExprList :: [(Int, LamExpr)] -> [(Int, LamExpr)] -> [(Int, LamExpr)]
+formFuncExprList [] ys = []
+formFuncExprList (x@(n, e):xs) ys = [(n, formExpr ([e] ++ fmap (snd) ys))] ++ formFuncExprList xs ys
 
-parallelSubst :: LamExpr -> [Int] -> Int -> [LamExpr] -> LamExpr
-parallelSubst f xs y [] = f
-parallelSubst f xs y (e:es) = parallelSubst (parallelSubst' f xs y e) xs y es
+parallelSubst' :: LamExpr -> [Int] -> Int -> LamExpr -> Bool -> LamExpr
+parallelSubst' f [] n e b = f
+parallelSubst' f xs n e (True) = f
+parallelSubst' f (x:xs) n e b | n == x    = parallelSubst' (varSubst f x e) xs n e (True)
+                              | otherwise = parallelSubst' f xs n e b
 
--- parallelFunSubst :: LamExpr -> LamExpr -> [[Int]] -> LamExpr
+parallelSubst :: LamExpr -> [Int] -> [(Int, LamExpr)] -> LamExpr
+parallelSubst f xs [] = f
+parallelSubst f xs (e@(n,e'):es) = parallelSubst s xs es
+            where s = parallelSubst' f xs n e' (False)
+
+handleLetExpr' :: [([Int], LetExpr)] -> [Int] -> [(Int, LamExpr)]
+handleLetExpr' [] ys = []
+handleLetExpr' (x@(n:ns, e1):xs) ys = [(n + 1000, unmarkSubst $ parallelSubst f ys (formExprList ys ys))] ++ handleLetExpr' xs ys
+            where f = formExpression (ys ++ ns) (e1)
+
+handleLetExpr :: [([Int], LetExpr)] -> [[Int]] -> LetExpr -> LamExpr
+handleLetExpr xs yss e = unmarkSubst $ parallelSubst (convertLetToLambda e yss) ys fs
+            where ys = retrieveFunctionIds yss
+                  f' = handleLetExpr' xs ys
+                  fs = formFuncExprList f' f'
+
+formScottEncoding :: Int -> LamExpr
+formScottEncoding 0 = LamAbs 0 (LamAbs 1 (LamVar 0))
+formScottEncoding n = LamAbs 0 (LamAbs 1 (LamApp (LamVar 1) (formScottEncoding (n-1))))
 
 convertLetToLambda :: LetExpr -> [[Int]] -> LamExpr
-convertLetToLambda (LetDef ((x:xs, e1@(LetFun y)):[]) (e2)) yss = subst (convertLetToLambda e2 yss) x (LamApp f' f')
-            where ys = retrieveFunctionIds yss
-                  f = formExpression (ys ++ xs) (e1)
-                  e = convertLetToLambda e1 yss
-                  f' = parallelSubst f ys x (formExprList ys ys)
-convertLetToLambda (LetDef ((x:xs, e1):[]) (e2)) yss = subst (convertLetToLambda e2 yss) x (LamApp f f)
-            where f = formExpression (x:xs) (e1)
+convertLetToLambda (LetDef (es) (e)) yss = handleLetExpr es yss e
 convertLetToLambda (LetApp e1 e2) yss = LamApp (convertLetToLambda e1 yss) (convertLetToLambda e2 yss)
 convertLetToLambda (LetVar x) yss = LamVar x
-convertLetToLambda (LetFun x) yss = LamVar x
-convertLetToLambda (LetNum x) yss = LamVar x
+convertLetToLambda (LetFun x) yss = LamVar (x + 1000)
+convertLetToLambda (LetNum x) yss = formScottEncoding x
 
 retrieveFunctionIds :: [[Int]] -> [Int]
-retrieveFunctionIds ((x:xs):xss) = [x] ++ retrieveFunctionIds xss
+retrieveFunctionIds ((x:xs):xss) = [x + 1000] ++ retrieveFunctionIds xss
 retrieveFunctionIds [] = []
 
 retrieveExprIds :: LetExpr -> [[Int]]
