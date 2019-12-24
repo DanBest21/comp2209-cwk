@@ -357,89 +357,110 @@ parseLet s = parseLetExp expr s
 -- Translate a let expression into lambda calculus, using Scott numerals
 -- convert let symbols to lambda variables using Jansen's techniques rather than Y
 
+-- Forms an expression by chaining the given integer array using LamAbs, 
+-- and then placing the passed LetExpr converted to a LamExpr at the end. 
 formExpression :: [Int] -> LetExpr -> LamExpr
 formExpression (x:xs) e = LamAbs x (formExpression xs e)
 formExpression [] e = e'
-            where e' = convertLetToLambda e (retrieveExprIds e)
+            where e' = convertLetToLambda e
 
+-- Marks something that has already been substituted by increasing the value by 100000.
 markSubst :: LamExpr -> LamExpr
 markSubst (LamApp e1 e2) = LamApp (markSubst (e1)) (markSubst (e2))
-markSubst (LamAbs x e) = LamAbs (x + 10000) (markSubst e)
-markSubst (LamVar x) = LamVar (x + 10000)
+markSubst (LamAbs x e) = LamAbs (x + 100000) (markSubst e)
+markSubst (LamVar x) = LamVar (x + 100000)
 
+-- Unmarks anything that has been substituted by decreasing the value by 100000 (back to its original value). 
 unmarkSubst :: LamExpr -> LamExpr
 unmarkSubst (LamApp e1 e2) = LamApp (unmarkSubst (e1)) (unmarkSubst (e2))
-unmarkSubst (LamAbs x e) | x >= 10000 = LamAbs (x - 10000) (unmarkSubst e)
+unmarkSubst (LamAbs x e) | x >= 100000 = LamAbs (x - 100000) (unmarkSubst e)
                          | otherwise = LamAbs x (unmarkSubst e)
-unmarkSubst (LamVar x) | x >= 10000 = LamVar (x - 10000)
+unmarkSubst (LamVar x) | x >= 100000 = LamVar (x - 100000)
                        | otherwise = LamVar x
 
+-- Function adapted from the "subst" function shown during the lecture on Interpreters (Subsitution) - (c) Julian Rathke, University of Southampton 2019
+-- This version of the function only performs substitutions on LamVars, marking any substitutions made.
 varSubst :: LamExpr -> Int -> LamExpr -> LamExpr
 varSubst (LamVar x) y e | x == y = markSubst e
                         | x /= y = LamVar x
 varSubst (LamAbs x e1) y e = LamAbs x (varSubst e1 y e)            
 varSubst (LamApp e1 e2) y e = LamApp (varSubst e1 y e) (varSubst e2 y e)
 
+-- Forms an expression by taking each LamExpr in a list and placing it in a LamApp using foldl1.
 formExpr :: [LamExpr] -> LamExpr
 formExpr es = foldl1 (\e1 -> \e2 -> LamApp (e1) (e2)) es
 
+-- Forms a list of LamVars from a list of Int values.
 formVars :: [Int] -> [LamExpr]
 formVars [] = []
 formVars (x:xs) = [LamVar x] ++ (formVars xs)
 
+-- Forms a list of LamExprs, with a Int to determine what it should replace.
+-- This is used to perform inner substitutions. 
 formExprList :: [Int] -> [Int] -> [(Int, LamExpr)]
 formExprList [] ys = []
 formExprList (x:xs) ys = [(x, formExpr $ formVars ([x] ++ ys))] ++ formExprList xs ys
 
+-- Forms a list of LamExprs, with a Int to determine what it should replace.
+-- This is used to perform the outermost "in" substitution.
 formFuncExprList :: [(Int, LamExpr)] -> [(Int, LamExpr)] -> [(Int, LamExpr)]
 formFuncExprList [] ys = []
 formFuncExprList (x@(n, e):xs) ys = [(n, formExpr ([e] ++ fmap (snd) ys))] ++ formFuncExprList xs ys
 
-parallelSubst' :: LamExpr -> [Int] -> Int -> LamExpr -> Bool -> LamExpr
-parallelSubst' f [] n e b = f
-parallelSubst' f xs n e (True) = f
-parallelSubst' f (x:xs) n e b | n == x    = parallelSubst' (varSubst f x e) xs n e (True)
-                              | otherwise = parallelSubst' f xs n e b
+-- Helper function that performs the substitution for a single expression in a list of
+-- that must be substituted in one-by-one.
+parallelSubst' :: LamExpr -> [Int] -> Int -> LamExpr -> LamExpr
+parallelSubst' f [] n e = f
+parallelSubst' f (x:xs) n e | n == x    = parallelSubst' (varSubst f x e) xs n e
+                            | otherwise = parallelSubst' f xs n e
 
+-- Performs the parallel substitution for each LamExpr in the [(Int, LamExpr)] list in turn, by means
+-- of the helper function - parallelSubst'.
 parallelSubst :: LamExpr -> [Int] -> [(Int, LamExpr)] -> LamExpr
 parallelSubst f xs [] = f
 parallelSubst f xs (e@(n,e'):es) = parallelSubst s xs es
-            where s = parallelSubst' f xs n e' (False)
+            where s = parallelSubst' f xs n e'
 
-handleLetExpr' :: [([Int], LetExpr)] -> [Int] -> [(Int, LamExpr)]
-handleLetExpr' [] ys = []
-handleLetExpr' (x@(n:ns, e1):xs) ys = [(n + 1000, unmarkSubst $ parallelSubst f ys (formExprList ys ys))] ++ handleLetExpr' xs ys
+-- Helper function that performs the inner substitutions (e.g. [f := f f g || g := g f g]).
+handleDefExpr' :: [([Int], LetExpr)] -> [Int] -> [(Int, LamExpr)]
+handleDefExpr' [] ys = []
+handleDefExpr' (x@(n:ns, e1):xs) ys = [(n + 1000, unmarkSubst $ parallelSubst f ys (formExprList ys ys))] ++ handleDefExpr' xs ys
             where f = formExpression (ys ++ ns) (e1)
 
-handleLetExpr :: [([Int], LetExpr)] -> [[Int]] -> LetExpr -> LamExpr
-handleLetExpr xs yss e = unmarkSubst $ parallelSubst (convertLetToLambda e yss) ys fs
-            where ys = retrieveFunctionIds yss
-                  f' = handleLetExpr' xs ys
+-- Handles the entire LetDef expression, and specifically the outermost "in" substitution 
+-- (e.g. [f := f' f' g' || g:= g' f' g']).
+handleDefExpr :: [([Int], LetExpr)] -> LetExpr -> LamExpr
+handleDefExpr xs e = unmarkSubst $ parallelSubst (convertLetToLambda e) ys fs
+            where yss = retrieveExprIds xs
+                  ys = retrieveFunctionIds yss
+                  f' = handleDefExpr' xs ys
                   fs = formFuncExprList f' f'
 
+-- Converts a number to the appropriate Scott Encoding LamExpr.
 formScottEncoding :: Int -> LamExpr
 formScottEncoding 0 = LamAbs 0 (LamAbs 1 (LamVar 0))
 formScottEncoding n = LamAbs 0 (LamAbs 1 (LamApp (LamVar 1) (formScottEncoding (n-1))))
 
-convertLetToLambda :: LetExpr -> [[Int]] -> LamExpr
-convertLetToLambda (LetDef (es) (e)) yss = handleLetExpr es yss e
-convertLetToLambda (LetApp e1 e2) yss = LamApp (convertLetToLambda e1 yss) (convertLetToLambda e2 yss)
-convertLetToLambda (LetVar x) yss = LamVar x
-convertLetToLambda (LetFun x) yss = LamVar (x + 1000)
-convertLetToLambda (LetNum x) yss = formScottEncoding x
+-- Converts a Let statement to it's appropriate Lambda expression.
+convertLetToLambda :: LetExpr -> LamExpr
+convertLetToLambda (LetDef (es) (e)) = handleDefExpr es e
+convertLetToLambda (LetApp e1 e2) = LamApp (convertLetToLambda e1) (convertLetToLambda e2)
+convertLetToLambda (LetVar x) = LamVar x
+convertLetToLambda (LetFun x) = LamVar (x + 1000)
+convertLetToLambda (LetNum x) = formScottEncoding x
 
+-- Retrieves the function IDs (the first number in each list) from a List of List of Int values.
 retrieveFunctionIds :: [[Int]] -> [Int]
 retrieveFunctionIds ((x:xs):xss) = [x + 1000] ++ retrieveFunctionIds xss
 retrieveFunctionIds [] = []
 
-retrieveExprIds :: LetExpr -> [[Int]]
-retrieveExprIds (LetApp e1 e2) = retrieveExprIds e1 ++ retrieveExprIds e2
-retrieveExprIds (LetDef ((xs, e1):[]) (e2)) = [xs] ++ retrieveExprIds e2
-retrieveExprIds (LetDef ((xs, e1):xss) (e2)) = [xs] ++ retrieveExprIds (LetDef (xss) (e2)) ++ retrieveExprIds e1
-retrieveExprIds e = []
+-- Retrieves the LetDef expression [([Int], LetExpr)], takes each [Int] and puts it into a list.
+retrieveExprIds :: [([Int], LetExpr)] -> [[Int]]
+retrieveExprIds [] = []
+retrieveExprIds (x@(ys, e):xs) = ys : retrieveExprIds xs 
 
 letToLambda :: LetExpr -> LamExpr
-letToLambda e = alphaNorm $ convertLetToLambda e (retrieveExprIds e)
+letToLambda e = alphaNorm $ convertLetToLambda e
 
 -- Challenge 6
 -- Convert a lambda calculus expression into one using let expressions and application
