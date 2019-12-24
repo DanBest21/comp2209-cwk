@@ -460,7 +460,7 @@ retrieveExprIds [] = []
 retrieveExprIds (x@(ys, e):xs) = ys : retrieveExprIds xs 
 
 letToLambda :: LetExpr -> LamExpr
-letToLambda e = alphaNorm $ convertLetToLambda e
+letToLambda e = convertLetToLambda e
 
 -- Challenge 6
 -- Convert a lambda calculus expression into one using let expressions and application
