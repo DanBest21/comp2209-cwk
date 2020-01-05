@@ -8,6 +8,7 @@ module Challenges (alphaNorm, countAllReds, printLambda, parseLet, letToLambda,
 -- Import standard library and parsing definitions from Hutton 2016, Chapter 13
 import Data.Char
 import Data.List
+import Data.Maybe
 import Parsing
 
 -- abstract data type for simple lambda calculus expressions
@@ -465,5 +466,83 @@ letToLambda e = convertLetToLambda e
 -- Challenge 6
 -- Convert a lambda calculus expression into one using let expressions and application
 -- can use lambda lifting techniques described in wikipedia article
+
+subst :: LamExpr -> LamExpr -> LamExpr -> LamExpr
+subst e1@(LamApp l r) e2 e | e1 == e2  = e
+                           | otherwise = LamApp (subst l e2 e) (subst r e2 e)
+subst e1@(LamAbs x e') e2 e | e1 == e2  = e
+                            | otherwise = LamAbs x (subst e' e2 e)
+subst e1@(LamVar x) e2 e | e1 == e2  = e
+                         | otherwise = e1
+
+retrieveSubExpr :: LamExpr -> Maybe LamExpr
+retrieveSubExpr (LamAbs x (LamApp (_) e@(LamAbs _ (_)))) = Just e
+retrieveSubExpr (LamApp (e1) (e2)) | right /= Nothing = right 
+                                   | left /= Nothing  = left
+                                   | otherwise        = Nothing
+            where right = retrieveSubExpr e2
+                  left = retrieveSubExpr e1
+retrieveSubExpr (LamAbs x (e)) = retrieveSubExpr e
+retrieveSubExpr (LamVar x) = Nothing
+
+retrieveFreeVariables :: LamExpr -> LamExpr -> [Int]
+retrieveFreeVariables (LamApp (e1) (e2)) s = (retrieveFreeVariables e1 s) ++ (retrieveFreeVariables e2 s)
+retrieveFreeVariables (LamAbs x (e)) s = retrieveFreeVariables e s
+retrieveFreeVariables (LamVar x) s | bFree     = [x]
+                                   | otherwise = []
+            where bFree = isFree s x
+
+makeLetCall :: Int -> LamExpr -> [Int]
+makeLetCall f s = f:fv
+            where fv = nub $ retrieveFreeVariables s s
+
+letCombine :: LetExpr -> LetExpr -> Bool -> LetExpr
+letCombine (LetDef xs e1) (LetDef ys e2) b | b         = LetDef (xs ++ ys) e2
+                                           | otherwise = LetDef (xs ++ ys) (LetApp e1 e2)
+letCombine (LetDef xs e1) e2 b = LetDef xs (LetApp e1 e2)
+letCombine e1 (LetDef xs e2) b = LetDef xs (LetApp e1 e2)
+
+handleFuncInLambda :: [Int] -> [Int]
+handleFuncInLambda (x:xs) = (x + 1000) : xs
+
+lambdaLift :: LamExpr -> Maybe LamExpr -> Int -> LetExpr
+lambdaLift e (Just s@(LamAbs x s')) f | bDef      = letCombine def inExpr True
+                                      | otherwise = def
+            where gs = makeLetCall f s
+                  g = formExpr $ formVars (handleFuncInLambda gs)
+                  inExpr = convertLambdaToLet (subst e s g) (f + 1)
+                  bDef = startsDef inExpr
+                  def = LetDef [(gs ++ [x], deLambda s' f)] (inExpr)
+
+startsDef :: LetExpr -> Bool
+startsDef (LetDef _ _) = True
+startsDef e = False
+
+retrieveAbsSeq :: LamExpr -> [Int] -> ([Int], LamExpr)
+retrieveAbsSeq (LamAbs x e) xs = retrieveAbsSeq e (x:xs)
+retrieveAbsSeq e xs = (xs, e)
+
+deLambda :: LamExpr -> Int -> LetExpr
+deLambda (LamApp (LamAbs x e) (e2)) f = letCombine (LetDef [(xs, deLambda e' (f + 1000))] (LetFun f)) (deLambda e2 (f + 1)) False
+            where zs = retrieveAbsSeq e [f, x]
+                  xs = fst zs
+                  e' = snd zs
+deLambda (LamApp (e1) (LamAbs x e)) f = letCombine (deLambda e1 (f + 1)) (LetDef [(xs, deLambda e' (f + 1000))] (LetFun f)) False
+            where zs = retrieveAbsSeq e [f, x]
+                  xs = fst zs
+                  e' = snd zs
+deLambda (LamApp (e1) (e2)) f = LetApp (deLambda e1 f) (deLambda e2 f)
+deLambda (LamAbs x e) f = LetDef [(xs, deLambda e' (f + 1))] (LetFun f)
+            where zs = retrieveAbsSeq e [f, x]
+                  xs = fst zs
+                  e' = snd zs
+deLambda (LamVar x) f | x >= 1000 = LetFun (x - 1000)
+                      | otherwise = LetVar x
+
+convertLambdaToLet :: LamExpr -> Int -> LetExpr
+convertLambdaToLet e f | s /= Nothing = lambdaLift e s f 
+                       | otherwise    = deLambda e f
+            where s = retrieveSubExpr e
+
 lambdaToLet :: LamExpr -> LetExpr
-lambdaToLet _ = LetVar (-1)
+lambdaToLet e = convertLambdaToLet e 0
