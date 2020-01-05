@@ -523,11 +523,11 @@ retrieveAbsSeq (LamAbs x e) xs = retrieveAbsSeq e (x:xs)
 retrieveAbsSeq e xs = (xs, e)
 
 deLambda :: LamExpr -> Int -> LetExpr
-deLambda (LamApp (LamAbs x e) (e2)) f = letCombine (LetDef [(xs, deLambda e' (f + 1))] (LetFun f)) (deLambda e2 (f + 1)) False
+deLambda (LamApp (LamAbs x e) (e2)) f = letCombine (LetDef [(xs, deLambda e' (f + 100))] (LetFun f)) (deLambda e2 (f + 1)) False
             where zs = retrieveAbsSeq e [f, x]
                   xs = fst zs
                   e' = snd zs
-deLambda (LamApp (e1) (LamAbs x e)) f = letCombine (deLambda e1 (f + 1)) (LetDef [(xs, deLambda e' (f + 1))] (LetFun f)) False
+deLambda (LamApp (e1) (LamAbs x e)) f = letCombine (deLambda e1 (f + 1)) (LetDef [(xs, deLambda e' (f + 100))] (LetFun f)) False
             where zs = retrieveAbsSeq e [f, x]
                   xs = fst zs
                   e' = snd zs
