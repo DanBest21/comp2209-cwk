@@ -467,6 +467,7 @@ letToLambda e = convertLetToLambda e
 -- Convert a lambda calculus expression into one using let expressions and application
 -- can use lambda lifting techniques described in wikipedia article
 
+-- Function taken from the "subst" function shown during the lecture on Interpreters (Subsitution) - (c) Julian Rathke, University of Southampton 2019
 subst :: LamExpr -> LamExpr -> LamExpr -> LamExpr
 subst e1@(LamApp l r) e2 e | e1 == e2  = e
                            | otherwise = LamApp (subst l e2 e) (subst r e2 e)
@@ -475,6 +476,9 @@ subst e1@(LamAbs x e') e2 e | e1 == e2  = e
 subst e1@(LamVar x) e2 e | e1 == e2  = e
                          | otherwise = e1
 
+-- Retrieves any sub-expression that needs to be lambda lifted in order to convert the entire expression
+-- to a let expression. Since it is possible that such an expression may not exist, the return value
+-- is a Maybe LamExpr as opposed to simply a LamExpr.   
 retrieveSubExpr :: LamExpr -> Maybe LamExpr
 retrieveSubExpr (LamAbs x (LamApp (_) e@(LamAbs _ (_)))) = Just e
 retrieveSubExpr (LamApp (e1) (e2)) | right /= Nothing = right 
@@ -485,6 +489,7 @@ retrieveSubExpr (LamApp (e1) (e2)) | right /= Nothing = right
 retrieveSubExpr (LamAbs x (e)) = retrieveSubExpr e
 retrieveSubExpr (LamVar x) = Nothing
 
+-- Retrieves all of the free variables in a LamExpr, and places them into an [Int].
 retrieveFreeVariables :: LamExpr -> LamExpr -> [Int]
 retrieveFreeVariables (LamApp (e1) (e2)) s = (retrieveFreeVariables e1 s) ++ (retrieveFreeVariables e2 s)
 retrieveFreeVariables (LamAbs x (e)) s = retrieveFreeVariables e s
@@ -492,19 +497,35 @@ retrieveFreeVariables (LamVar x) s | bFree     = [x]
                                    | otherwise = []
             where bFree = isFree s x
 
+-- Gets an [Int] that represents all of the free variables in an expression, preceded by the passed
+-- f value that represents the function identifier. This is an implementation of the "make-call" 
+-- function, as described in the "Lambda lifting" wikipedia article. 
 makeLetCall :: Int -> LamExpr -> [Int]
 makeLetCall f s = f:fv
             where fv = nub $ retrieveFreeVariables s s
 
+-- Combines one or two LetDef expressions:
+-- - In the case of one LetDef expression, simply apply a LetApp to the non-LetDef expression and its
+--   current "in" LetExpr to replace the said "in" LetExpr.
+-- - In the case of two LetDef expressions, merge these two statements into a single LetDef expression. The
+--   "in" statement is changed in this case by the passed b Bool parameter to perform the appropriate behaviour.
+-- This function is loosely based on the let-combine function as described in the "Let expression" wikipedia article. 
 letCombine :: LetExpr -> LetExpr -> Bool -> LetExpr
 letCombine (LetDef xs e1) (LetDef ys e2) b | b         = LetDef (xs ++ ys) e2
                                            | otherwise = LetDef (xs ++ ys) (LetApp e1 e2)
 letCombine (LetDef xs e1) e2 b = LetDef xs (LetApp e1 e2)
 letCombine e1 (LetDef xs e2) b = LetDef xs (LetApp e1 e2)
 
+-- Takes a [Int] list and increases the first value by 1000.
+-- This is to allow LetFun and LetVar to be distinguishable from one another in a LamExpr.
 handleFuncInLambda :: [Int] -> [Int]
 handleFuncInLambda (x:xs) = (x + 1000) : xs
 
+-- Based off the "lambda-lift" function, as described in the "lambda lifting" wikipedia article.
+-- Performs a lambda lift on some expression e with a sub-expression s, generating a g that
+-- represents all the free variables preceded by the function identifier.
+-- This new statement is either returned, or if the formed inExpr also contains a LetDef statement,
+-- then perform a let combine, with the in statement at the end being that of the inExpr.
 lambdaLift :: LamExpr -> Maybe LamExpr -> Int -> LetExpr
 lambdaLift e (Just s@(LamAbs x s')) f | bDef      = letCombine def inExpr True
                                       | otherwise = def
@@ -514,14 +535,28 @@ lambdaLift e (Just s@(LamAbs x s')) f | bDef      = letCombine def inExpr True
                   bDef = startsDef inExpr
                   def = LetDef [(gs ++ [x], deLambda s' f)] (inExpr)
 
+-- Checks if the passed LetExpr starts with a LetDef - returns True if it does, False if it doesn't.
 startsDef :: LetExpr -> Bool
 startsDef (LetDef _ _) = True
 startsDef e = False
 
+-- Retrieves an Abstraction sequence in the form of a ([Int], LamExpr) - i.e. an uninterrupted chain of 
+-- LamAbs, taking the number from each and putting it into an ordered [Int], and then pairing it with 
+-- the LamExpr found at the end of the chain.
 retrieveAbsSeq :: LamExpr -> [Int] -> ([Int], LamExpr)
 retrieveAbsSeq (LamAbs x e) xs = retrieveAbsSeq e (x:xs)
 retrieveAbsSeq e xs = (xs, e)
 
+-- Loosely based off the "de-lambda" function discussed in the "Let expression" wikipedia article.
+-- This function does the bulk of the work in converting a LamExpr to a LetExpr:
+-- - In the case of a LamApp with a LamAbs contained within it, perform a letCombine on a newly formed
+--   LetDef statement and the result of deLambda of the other expression, regardless of which expression
+--   is which. The in statement of this new expression will be the LetApp of both their in statements. 
+-- - In the case of a LamApp that does not meet this criteria, simply change it to a LetApp and perform
+--   deLambda on both expressions.
+-- - In the case of LamAbs, convert it to the equivalent LetDef expression.
+-- - In the case of LamVar, convert it to either a LetVar if the value is below 1000, or a LetFun
+--   if the value is above or equal to 1000.
 deLambda :: LamExpr -> Int -> LetExpr
 deLambda (LamApp (LamAbs x e) (e2)) f = letCombine (LetDef [(xs, deLambda e' (f + 100))] (LetFun f)) (deLambda e2 (f + 1)) False
             where zs = retrieveAbsSeq e [f, x]
@@ -539,6 +574,7 @@ deLambda (LamAbs x e) f = LetDef [(xs, deLambda e' (f + 1))] (LetFun f)
 deLambda (LamVar x) f | x >= 1000 = LetFun (x - 1000)
                       | otherwise = LetVar x
 
+-- Converts a LamExpr to the appropriate LetExpr using multiple helper functions (as described above).
 convertLambdaToLet :: LamExpr -> Int -> LetExpr
 convertLambdaToLet e f | s /= Nothing = lambdaLift e s f 
                        | otherwise    = deLambda e f
