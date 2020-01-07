@@ -133,7 +133,9 @@ challenge6Tests =
       LetDef [([0,0,1],LetApp (LetVar 0) (LetVar 1)),([1,0],LetApp (LetVar 0) (LetApp (LetFun 0) (LetVar 0)))] (LetFun 1)),
     -- Additional tests
     (lambdaToLet (LamAbs 0 (LamAbs 1 (LamVar 1))),
-      LetDef [([0,0,1],LetVar 1) (LetFun 0)])
+      LetDef [([0,0,1],LetVar 1)] (LetFun 0)),
+    (lambdaToLet (LamApp (LamAbs 0 (LamVar 0)) (LamApp (LamAbs 1 (LamVar 1)) (LamAbs 2 (LamVar 2)))),
+      LetDef [([0,0],LetVar 0),([1,1],LetVar 1),([2,2],LetVar 2)] (LetApp (LetFun 0) (LetApp (LetFun 1) (LetFun 2)))) 
   ]
 
 -- The main program checks and displays the results of the tests 

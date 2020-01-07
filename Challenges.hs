@@ -544,7 +544,7 @@ startsDef e = False
 -- LamAbs, taking the number from each and putting it into an ordered [Int], and then pairing it with 
 -- the LamExpr found at the end of the chain.
 retrieveAbsSeq :: LamExpr -> [Int] -> ([Int], LamExpr)
-retrieveAbsSeq (LamAbs x e) xs = retrieveAbsSeq e (x:xs)
+retrieveAbsSeq (LamAbs x e) xs = retrieveAbsSeq e (xs ++ [x])
 retrieveAbsSeq e xs = (xs, e)
 
 -- Loosely based off the "de-lambda" function discussed in the "Let expression" wikipedia article.
