@@ -112,8 +112,10 @@ challenge5Tests =
     (alphaNorm (letToLambda (LetDef [([0,0],LetFun 1),([1,1],LetVar 1)] (LetFun 0))),
         alphaNorm (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamVar 0)))))),
     (alphaNorm (letToLambda (LetDef [([0,0,1],LetVar 0),([1,1],LetApp (LetApp (LetFun 0) (LetVar 1)) (LetFun 1))] (LetFun 1))),
-        alphaNorm (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamVar 0)))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))))))
+        alphaNorm (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamVar 0)))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))))),
     -- Additional tests
+    (alphaNorm (letToLambda (LetDef [([0,0,1],(LetVar 1)),([1,1],(LetVar 2)),([2,1,2],(LetApp (LetVar 3) (LetFun 0)))] (LetFun 2))),
+        alphaNorm (LamApp (LamApp (LamApp (LamAbs 1000 (LamAbs 1001 (LamAbs 1002 (LamAbs 1 (LamAbs 2 (LamApp (LamVar 3) (LamApp (LamApp (LamApp (LamVar 1000) (LamVar 1000)) (LamVar 1001)) (LamVar 1002)))))))) (LamAbs 1000 (LamAbs 1001 (LamAbs 1002 (LamAbs 0 (LamAbs 1 (LamVar 1))))))) (LamAbs 1000 (LamAbs 1001 (LamAbs 1002 (LamAbs 1 (LamVar 2)))))) (LamAbs 1000 (LamAbs 1001 (LamAbs 1002 (LamAbs 1 (LamAbs 2 (LamApp (LamVar 3) (LamApp (LamApp (LamApp (LamVar 1000) (LamVar 1000)) (LamVar 1001)) (LamVar 1002))))))))))
   ]
 
 challenge6Tests :: [(LetExpr, LetExpr)]
@@ -128,8 +130,10 @@ challenge6Tests =
     (lambdaToLet (LamApp (LamAbs 0 (LamVar 0)) (LamAbs 0 (LamVar 0))),
       LetDef [([0,0],LetVar 0),([1,0],LetVar 0)] (LetApp (LetFun 0) (LetFun 1))),
     (lambdaToLet (LamAbs 0 (LamApp (LamVar 0) (LamAbs 1 (LamApp (LamVar 0) (LamVar 1))))),
-      LetDef [([0,0,1],LetApp (LetVar 0) (LetVar 1)),([1,0],LetApp (LetVar 0) (LetApp (LetFun 0) (LetVar 0)))] (LetFun 1))
+      LetDef [([0,0,1],LetApp (LetVar 0) (LetVar 1)),([1,0],LetApp (LetVar 0) (LetApp (LetFun 0) (LetVar 0)))] (LetFun 1)),
     -- Additional tests
+    (lambdaToLet (LamAbs 0 (LamAbs 1 (LamVar 1))),
+      LetDef [([0,0,1],LetVar 1) (LetFun 0)])
   ]
 
 -- The main program checks and displays the results of the tests 
