@@ -91,7 +91,13 @@ challenge4Tests =
     (parseLet "let f1 x1 = x2 in f1 x1", 
         Just (LetDef [([1,1],LetVar 2)] (LetApp (LetFun 1) (LetVar 1)))),
     (parseLet "let f1 x2 = x2; f2 x1 = x1 in f1 x1",
-        Just (LetDef [([1,2],LetVar 2),([2,1],LetVar 1)] (LetApp (LetFun 1) (LetVar 1))))
+        Just (LetDef [([1,2],LetVar 2),([2,1],LetVar 1)] (LetApp (LetFun 1) (LetVar 1)))),
+    -- Additional tests
+    (parseLet "(x1 ((x2 x3)))", Just (LetApp (LetVar 1) (LetApp (LetVar 2) (LetVar 3)))),
+    (parseLet "(x1 ((x2 x3))", Nothing),
+    (parseLet "let f1 x2 x3 = x3 x2 in f1", Just (LetDef [([1,2,3], (LetApp (LetVar 3) (LetVar 2)))] (LetFun 1))),
+    (parseLet "let f0 x0 = f1; f1 x1 = x1 in f0", Just (LetDef [([0,0], (LetFun 1)), ([1,1], (LetVar 1))] (LetFun 0))),
+    (parseLet "let f0 x0 x1 = x0; f1 x1 = f0 x1 in f1", Just (LetDef [([0,0,1], (LetVar 0)), ([1,1], (LetApp (LetFun 0) (LetVar 1)))] (LetFun 1)))
   ]
 
 challenge5Tests :: [(LamExpr, LamExpr)]
@@ -106,7 +112,8 @@ challenge5Tests =
     (alphaNorm (letToLambda (LetDef [([0,0],LetFun 1),([1,1],LetVar 1)] (LetFun 0))),
         alphaNorm (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamVar 0)))))),
     (alphaNorm (letToLambda (LetDef [([0,0,1],LetVar 0),([1,1],LetApp (LetApp (LetFun 0) (LetVar 1)) (LetFun 1))] (LetFun 1))),
-        alphaNorm (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamVar 0)))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))))))  
+        alphaNorm (LamApp (LamApp (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1)))))) (LamAbs 0 (LamAbs 0 (LamAbs 0 (LamAbs 1 (LamVar 0)))))) (LamAbs 0 (LamAbs 1 (LamAbs 2 (LamApp (LamApp (LamApp (LamApp (LamVar 0) (LamVar 0)) (LamVar 1)) (LamVar 2)) (LamApp (LamApp (LamVar 1) (LamVar 0)) (LamVar 1))))))))
+    -- Additional tests
   ]
 
 challenge6Tests :: [(LetExpr, LetExpr)]
@@ -122,6 +129,7 @@ challenge6Tests =
       LetDef [([0,0],LetVar 0),([1,0],LetVar 0)] (LetApp (LetFun 0) (LetFun 1))),
     (lambdaToLet (LamAbs 0 (LamApp (LamVar 0) (LamAbs 1 (LamApp (LamVar 0) (LamVar 1))))),
       LetDef [([0,0,1],LetApp (LetVar 0) (LetVar 1)),([1,0],LetApp (LetVar 0) (LetApp (LetFun 0) (LetVar 0)))] (LetFun 1))
+    -- Additional tests
   ]
 
 -- The main program checks and displays the results of the tests 
@@ -148,13 +156,14 @@ testChallenge :: (Eq a, Show b) => [(a, a)] -> [(b, b)] -> Int -> Int -> IO ()
 testChallenge ( t@(p1, p2) : ts ) ( t'@(p1', p2') : ts' ) n m =
   do
     if p1 == p2
-      then putStrLn ("  Test " ++ show n ++ ": " ++ show p1' ++ " == " ++ show p2' ++ " - Passed")
-      else putStrLn ("  Test " ++ show n ++ ": " ++ show p1' ++ " == " ++ show p2' ++ " - Failed")
-    if p1 /= p2
-      then putStrLn ("  Correct output: " ++ show p2')
-      else putStr ""
+      then do
+        putStrLn ("  Test " ++ show n ++ ": " ++ show p1' ++ " == " ++ show p2' ++ " - Passed")
+      else do 
+        putStrLn ("  Test " ++ show n ++ ": " ++ show p1' ++ " == " ++ show p2' ++ " - Failed")
     testChallenge ts ts' (n + 1) (if p1 == p2 then m + 1 else m)
 testChallenge [] _ n m =
   do
-    putStrLn ("  " ++ show m ++ "/" ++ show (n - 1) ++ " tests passed")
+    putStrLn "  ***********************************"
+    putStrLn ("  ** " ++ show m ++ "/" ++ show (n - 1) ++ " tests passed")
+    putStrLn "  ***********************************"
     putStrLn ""
