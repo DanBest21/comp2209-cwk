@@ -246,7 +246,8 @@ digitsExp = do ds <- some digitExp
 
 -- Parses a number using the digitsExp function.
 numExp :: Parser LetExpr
-numExp = do n <- digitsExp
+numExp = do space
+            n <- digitsExp
             return (LetNum (read n))
 
 -- Parses a variable, and returns a LetVar.
@@ -312,7 +313,8 @@ eqnListExp = do e <- eqnExp
 
 -- Parses a let expression, and returns a LetDef.
 letExp :: Parser LetExpr
-letExp = do string "let"
+letExp = do space
+            string "let"
             space
             es <- eqnListExp
             space
