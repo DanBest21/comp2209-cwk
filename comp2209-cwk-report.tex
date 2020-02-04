@@ -2,6 +2,7 @@
 \usepackage[utf8]{inputenc}
 \usepackage{parskip}
 \usepackage{fancyhdr}
+\usepackage{listings}
 \usepackage[a4paper, total={6in, 8in}]{geometry}
 
 \title{COMP2209 - Lambda Calculus Challenges Report}
@@ -20,6 +21,7 @@
 	
 	\newpage
 	
+	\section{Report}
 	In order to complete the challenges, I made use of a variety of tools and techniques. 
 	
 	I chose to use Visual Studio Code as the IDE in which I coded the challenges in. I installed a plug-in for this called "Haskell Syntax Highlighting" that adds appropriate mark-up to make the code easier to read and distinguish between. However, I did not use the in-built console to run GHCI and test and run my code - instead, I had a separate Windows Terminal window that was running an instance of command prompt. This allowed me to split the screen in half, being able to code and test it in a console window without having to switch between tabs.
@@ -29,5 +31,12 @@
 	Whilst testing my code during its development, I utilised two main methods. The first was simply to use let expressions in the command-line to quickly set more complex parameters, and then to input these values into the function that I wanted to test. This saved significant time in that I could reuse these values in multiple functions with relative easy. The second was to use the in-built debugger tool to check the output of complex functions at each 'helper' function. This allowed me to quickly identify any such 'helper' functions that were returning unexpected values, and therefore allow me to identify where a problem may be and fix it. 
 	
 	As a side note, it is worth mentioning that I used the debugger significantly less whilst coding in Haskell than if I were coding in an imperative language. This is because of the nature of a functional programming language, where each function is intended to perform only one task, meaning that the problematic line of code causing a logic error can be more easily identified and corrected.
+	
+	\newpage
+	
+	\section{Bibliography}
+	\begin{enumerate}
+		\item Rathke, J. (2019). \textit{Interpreter "subst" and "free" functions.} University of Southampton
+	\end{enumerate}
 	
 \end{document}
